@@ -1,0 +1,45 @@
+date,account_id,description,amount,category
+2025-11-01,ACCT-001,AR Collection - Acme Corp,425000.00,ar_collection
+2025-11-03,ACCT-001,AP Payment - Raw Materials,-185000.00,ap_payment
+2025-11-07,ACCT-001,Payroll Bi-weekly,-385000.00,payroll
+2025-11-10,ACCT-004,Revenue Deposit,312000.00,revenue
+2025-11-12,ACCT-001,AP Payment - Logistics,-45000.00,ap_payment
+2025-11-15,ACCT-001,Rent Payment,-32000.00,operating_expense
+2025-11-15,ACCT-004,Utility Payment,-18500.00,operating_expense
+2025-11-18,ACCT-004,AR Collection - Beta Inc,275000.00,ar_collection
+2025-11-21,ACCT-001,Payroll Bi-weekly,-385000.00,payroll
+2025-11-25,ACCT-001,AP Payment - Components,-210000.00,ap_payment
+2025-11-28,ACCT-004,Revenue Deposit,198000.00,revenue
+2025-11-30,ACCT-001,Loan Payment,-45000.00,debt_service
+2025-12-01,ACCT-004,AR Collection - Gamma Ltd,525000.00,ar_collection
+2025-12-03,ACCT-001,AP Payment - Steel Supply,-310000.00,ap_payment
+2025-12-05,ACCT-001,Payroll Bi-weekly,-385000.00,payroll
+2025-12-08,ACCT-004,Revenue Deposit,287000.00,revenue
+2025-12-10,ACCT-001,AP Payment - Electrical,-67000.00,ap_payment
+2025-12-12,ACCT-004,AR Collection - Delta Corp,185000.00,ar_collection
+2025-12-15,ACCT-001,Rent Payment,-32000.00,operating_expense
+2025-12-15,ACCT-004,Utility Payment,-18500.00,operating_expense
+2025-12-15,ACCT-001,Quarterly Tax Payment,-125000.00,tax
+2025-12-19,ACCT-001,Payroll Bi-weekly,-385000.00,payroll
+2025-12-22,ACCT-001,AP Payment - Insurance,-95000.00,ap_payment
+2025-12-24,ACCT-004,Revenue Deposit,445000.00,revenue
+2025-12-28,ACCT-004,AR Collection - Epsilon Inc,165000.00,ar_collection
+2025-12-31,ACCT-001,Loan Payment,-45000.00,debt_service
+2026-01-02,ACCT-001,AR Collection - Acme Corp,398000.00,ar_collection
+2026-01-03,ACCT-001,AP Payment - Raw Materials,-225000.00,ap_payment
+2026-01-06,ACCT-004,Revenue Deposit,275000.00,revenue
+2026-01-09,ACCT-001,Payroll Bi-weekly,-385000.00,payroll
+2026-01-13,ACCT-001,AP Payment - Logistics,-52000.00,ap_payment
+2026-01-15,ACCT-001,Rent Payment,-32000.00,operating_expense
+2026-01-15,ACCT-004,Utility Payment,-18500.00,operating_expense
+2026-01-17,ACCT-004,AR Collection - Beta Inc,315000.00,ar_collection
+2026-01-20,ACCT-004,Revenue Deposit,198000.00,revenue
+2026-01-23,ACCT-001,Payroll Bi-weekly,-385000.00,payroll
+2026-01-27,ACCT-001,AP Payment - Components,-178000.00,ap_payment
+2026-01-29,ACCT-004,AR Collection - Zeta Corp,245000.00,ar_collection
+2026-01-31,ACCT-001,Loan Payment,-45000.00,debt_service
+2026-02-01,ACCT-004,Revenue Deposit,335000.00,revenue
+2026-02-03,ACCT-001,AP Payment - Steel Supply,-290000.00,ap_payment
+2026-02-04,ACCT-001,AR Collection - Gamma Ltd,475000.00,ar_collection
+2026-02-06,ACCT-001,Payroll Bi-weekly,-385000.00,payroll
+2026-02-07,ACCT-004,AR Collection - Delta Corp,195000.00,ar_collection

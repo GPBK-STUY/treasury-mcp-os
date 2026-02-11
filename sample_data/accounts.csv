@@ -1,0 +1,9 @@
+account_id,bank_name,account_type,currency,balance,yield_rate_bps,last_updated
+ACCT-001,Citizens Bank,checking,USD,2847500.00,0,2026-02-07
+ACCT-002,Citizens Bank,savings,USD,1250000.00,125,2026-02-07
+ACCT-003,Citizens Bank,money_market,USD,3500000.00,435,2026-02-07
+ACCT-004,JPMorgan Chase,checking,USD,1875000.00,0,2026-02-07
+ACCT-005,JPMorgan Chase,money_market,USD,2100000.00,450,2026-02-07
+ACCT-006,Deutsche Bank,checking,EUR,985000.00,0,2026-02-07
+ACCT-007,Deutsche Bank,savings,EUR,450000.00,275,2026-02-07
+ACCT-008,Citizens Bank,cd,USD,1000000.00,510,2026-02-07
