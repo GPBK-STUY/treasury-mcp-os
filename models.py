@@ -1,6 +1,6 @@
 """Pydantic models for Treasury Management MCP Server."""
 from __future__ import annotations
-from typing import Dict, List
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -136,3 +136,88 @@ class CovenantReport(BaseModel):
     breaches: int = Field(..., description="Number of breaches")
     warnings: int = Field(..., description="Number of warnings")
     recommendation: str = Field(..., description="Recommended actions")
+
+
+# ── Credit Report Models ──────────────────────────────────────────────
+
+class PersonalCreditProfile(BaseModel):
+    """Parsed personal credit report for a guarantor."""
+    borrower_name: str = Field(..., description="Guarantor full name")
+    credit_score: int = Field(..., description="FICO or VantageScore")
+    score_model: str = Field(..., description="Score model (e.g. FICO 8)")
+    report_date: str = Field(..., description="Date credit was pulled")
+    total_tradelines: int = Field(..., description="Total trade lines on file")
+    open_tradelines: int = Field(..., description="Currently open trade lines")
+    revolving_utilization_pct: float = Field(..., description="Revolving utilization %")
+    total_revolving_balance: float = Field(..., description="Total revolving balances")
+    total_revolving_limit: float = Field(..., description="Total revolving limits")
+    total_installment_balance: float = Field(..., description="Total installment balances")
+    monthly_installment_payments: float = Field(..., description="Monthly installment payment total")
+    derogatory_marks: int = Field(..., description="Derogatory marks count")
+    collections: int = Field(..., description="Collections count")
+    public_records: int = Field(..., description="Public records count")
+    late_payments_30d: int = Field(..., description="30-day late payments")
+    late_payments_60d: int = Field(..., description="60-day late payments")
+    late_payments_90d: int = Field(..., description="90+ day late payments")
+    payment_history_pct: float = Field(..., description="On-time payment percentage")
+    oldest_account_years: float = Field(..., description="Age of oldest account in years")
+    recent_inquiries_6mo: int = Field(..., description="Hard inquiries in last 6 months")
+    bankruptcies: int = Field(..., description="Bankruptcy filings")
+    foreclosures: int = Field(..., description="Foreclosures")
+    tax_liens: int = Field(..., description="Tax liens")
+    score_tier: str = Field(..., description="excellent, good, fair, poor, or very_poor")
+
+
+class BusinessCreditProfile(BaseModel):
+    """Parsed business credit report."""
+    business_name: str = Field(..., description="Legal business name")
+    report_date: str = Field(..., description="Date report was pulled")
+    paydex_score: int = Field(..., description="D&B Paydex score (0-100)")
+    intelliscore: Optional[int] = Field(None, description="Experian Intelliscore (1-100)")
+    years_in_business: float = Field(..., description="Years in operation")
+    industry: str = Field(..., description="Industry classification")
+    total_trade_experiences: int = Field(..., description="Total trade references")
+    current_pct: float = Field(..., description="Percent of trades paid current")
+    days_beyond_terms_avg: float = Field(..., description="Avg days beyond payment terms")
+    high_credit: float = Field(..., description="Highest credit extended")
+    total_balance_outstanding: float = Field(..., description="Total outstanding balance")
+    payment_trend: str = Field(..., description="improving, stable, or declining")
+    derogatory_count: int = Field(..., description="Derogatory trade experiences")
+    liens: int = Field(..., description="UCC liens or tax liens")
+    judgments: int = Field(..., description="Judgments on file")
+    ucc_filings: int = Field(..., description="UCC filings count")
+    bankruptcy_flag: bool = Field(..., description="Bankruptcy on file")
+    d_and_b_rating: str = Field(..., description="D&B credit rating (e.g. 3A2)")
+    paydex_tier: str = Field(..., description="low_risk, moderate_risk, or high_risk")
+
+
+class CreditReportSummary(BaseModel):
+    """Combined personal + business credit report output."""
+    personal_profiles: List[PersonalCreditProfile] = Field(..., description="Guarantor credit profiles")
+    business_profile: Optional[BusinessCreditProfile] = Field(None, description="Business credit profile")
+    report_date: str = Field(..., description="Analysis timestamp")
+
+
+class CreditRiskFactor(BaseModel):
+    """Individual risk or opportunity identified in credit analysis."""
+    category: str = Field(..., description="credit_score, utilization, payment_history, etc.")
+    severity: str = Field(..., description="positive, neutral, watch, concern, or critical")
+    finding: str = Field(..., description="What was found")
+    impact: str = Field(..., description="How this affects lending decisions")
+    recommendation: str = Field(..., description="Specific action to take")
+
+
+class CreditPositionAssessment(BaseModel):
+    """Integrated credit + cash flow lending readiness assessment."""
+    business_name: str = Field(..., description="Business name")
+    assessment_date: str = Field(..., description="Assessment timestamp")
+    overall_credit_rating: str = Field(..., description="strong, acceptable, marginal, weak, or adverse")
+    personal_score_avg: float = Field(..., description="Average guarantor FICO score")
+    personal_score_lowest: int = Field(..., description="Lowest guarantor score")
+    business_paydex: Optional[int] = Field(None, description="Business Paydex score")
+    combined_debt_to_income: Optional[float] = Field(None, description="Combined personal DTI ratio")
+    personal_guaranty_strength: str = Field(..., description="strong, adequate, weak, or insufficient")
+    risk_factors: List[CreditRiskFactor] = Field(..., description="Identified risks and opportunities")
+    lending_capacity_estimate: str = Field(..., description="Estimated borrowing capacity range")
+    cross_sell_opportunities: List[str] = Field(..., description="Product recommendations based on credit profile")
+    recommendation: str = Field(..., description="Overall recommendation for the relationship")

@@ -1,0 +1,2 @@
+business_name,duns_number,report_date,paydex_score,intelliscore,years_in_business,sic_code,industry,total_trade_experiences,current_pct,days_beyond_terms_avg,high_credit,total_balance_outstanding,payment_trend,derogatory_count,liens,judgments,ucc_filings,bankruptcy_flag,d_and_b_rating,annual_revenue,employees,trade_payment_index
+Apex Manufacturing Corp,08-712-4531,2026-01-20,78,42,12,3599,Industrial Machinery,24,82.0,8.5,500000.00,385000.00,stable,1,0,0,3,false,3A2,24800000.00,145,78

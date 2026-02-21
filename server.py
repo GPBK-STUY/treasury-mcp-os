@@ -15,6 +15,8 @@ from tools.working_capital import analyze_working_capital as _analyze_working_ca
 from tools.payment_optimizer import optimize_payment_timing as _optimize_payment_timing
 from tools.fx_scanner import scan_fx_exposure as _scan_fx_exposure
 from tools.covenant_monitor import monitor_debt_covenants as _monitor_debt_covenants
+from tools.credit_parser import parse_credit_report as _parse_credit_report
+from tools.credit_assessor import assess_credit_position as _assess_credit_position
 
 mcp = FastMCP("TreasuryOS")
 
@@ -70,6 +72,25 @@ def monitor_debt_covenants() -> dict:
     """Monitor debt covenant compliance across credit facilities.
     Flags breaches and warnings (within 10% of threshold)."""
     return _monitor_debt_covenants(DATA_DIR)
+
+
+@mcp.tool()
+def parse_credit_report() -> dict:
+    """Parse personal and business credit reports already on file.
+    Extracts FICO scores, Paydex, utilization, payment history, derogatories,
+    and public records from credit data pulled during the application process."""
+    return _parse_credit_report(data_dir=DATA_DIR)
+
+
+@mcp.tool()
+def assess_credit_position(annual_gross_income: float = 0.0) -> dict:
+    """Assess combined credit + cash flow lending readiness.
+    Integrates credit reports with cash position and covenant data to produce
+    an overall credit rating, risk factors, lending capacity estimate, and
+    cross-sell opportunities.
+    Args: annual_gross_income (combined guarantor income for DTI calc, 0 to skip)."""
+    return _assess_credit_position(data_dir=DATA_DIR,
+                                   annual_gross_income=annual_gross_income)
 
 
 def main():

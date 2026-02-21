@@ -1,0 +1,3 @@
+borrower_name,ssn_last4,credit_score,score_model,report_date,total_tradelines,open_tradelines,derogatory_marks,collections,public_records,total_revolving_balance,total_revolving_limit,revolving_utilization_pct,total_installment_balance,monthly_installment_payments,oldest_account_years,recent_inquiries_6mo,late_payments_30d,late_payments_60d,late_payments_90d,payment_history_pct,bankruptcies,foreclosures,tax_liens
+John Mitchell,4872,742,FICO 8,2026-01-15,18,12,0,0,0,28500.00,85000.00,33.5,312000.00,2850.00,14.3,2,1,0,0,97.8,0,0,0
+Sarah Mitchell,9031,718,FICO 8,2026-01-15,14,9,1,0,0,42000.00,62000.00,67.7,185000.00,1650.00,11.2,3,2,1,0,95.2,0,0,0
