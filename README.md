@@ -53,7 +53,8 @@ git clone https://github.com/GPBK-STUY/treasury-mcp-os.git ~/Desktop/treasury-mc
 ```
 That's it. The setup script checks Python, installs dependencies, and configures Claude Desktop automatically. Restart Claude Desktop, look for the 🔨 icon, and start asking questions.
 
-See [QUICKSTART.md](QUICKSTART.md) for the full walkthrough, data setup, and troubleshooting.
+**Bankers & RMs:** See [QUICKSTART.md](QUICKSTART.md) for the full walkthrough, data setup, and troubleshooting.
+**Business Owners & Founders:** See [QUICKSTART-OWNERS.md](QUICKSTART-OWNERS.md) — same tool, written for people running the business instead of advising it.
 
 Test a Tool
 Open Claude Desktop and ask "What's my current cash position?" You should see balances for Apex Manufacturing Corp across 8 accounts in USD and EUR.
@@ -100,7 +101,8 @@ treasury-mcp-os/
 ├── server.py              ← Entry point. Registers 9 tools. Run this.
 ├── models.py              ← Data shapes. What each tool returns.
 ├── CLAUDE.md              ← Agent instructions. Banking guardrails.
-├── QUICKSTART.md          ← Setup guide for new users.
+├── QUICKSTART.md          ← Setup guide for bankers & RMs.
+├── QUICKSTART-OWNERS.md   ← Setup guide for business owners.
 ├── setup.sh               ← One-command installer.
 ├── pyproject.toml         ← Project config and dependencies.
 ├── tools/
@@ -122,6 +124,9 @@ treasury-mcp-os/
     ├── fx_rates.csv
     ├── personal_credit.csv
     └── business_credit.csv
+
+Who This Is For
+Two audiences, same tool. If you're a **commercial banker or RM**, TreasuryOS is your junior analyst — it does the number-crunching so you can focus on the client conversation. If you're a **business owner or founder**, it's the CFO you can't afford yet — it watches your cash, your credit, and your debt so nothing sneaks up on you.
 
 Where This Is Going
 This is V1. The tools work, the math is right, the architecture is clean. But the real play is bigger than a demo.
