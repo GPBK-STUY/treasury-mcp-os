@@ -16,6 +16,8 @@ What It Does
 5. Payment Timing Optimizer — Parses vendor discount terms (2/10 net 30) and tells you the annualized return of paying early. 2% discount for paying 20 days early = ~36.7% annualized. If your cost of capital is 10%, that's free money. Only recommends early payment when the math actually works.
 6. FX Exposure Scanner — Identifies non-USD payables, converts to USD, calculates Value at Risk. Most mid-market companies have unhedged FX exposure they don't even know about. This finds it.
 7. Debt Covenant Monitor — Tracks compliance across all facilities, calculates headroom percentages. Flags warnings below 10% headroom. A covenant breach can trigger cross-default clauses — you never want to be surprised by this.
+8. Credit Report Parser — Reads personal and business credit reports already on file from the application process. Extracts FICO scores, Paydex, utilization, payment history, derogatories, and public records. No new credit pull needed — uses what the institution already has.
+9. Credit Position Assessor — The integration tool. Chains credit data with cash position and covenant compliance to produce an overall credit rating, risk factors, lending capacity estimate, and cross-sell opportunities. This is the full underwriting picture in one query.
 
 The Architecture
 ┌──────────────────────────────────────────────────┐
@@ -44,35 +46,18 @@ The Architecture
 └──────────────────────────────────────────────────┘
 The tools contain the banking logic. The data layer is separate. Today it reads CSVs. Tomorrow you swap in Plaid or your bank's API. The tools don't change. Same logic, different data source.
 
-Quick Start
-Prerequisites
+Quick Start (One Command)
+Open Terminal and paste:
+```bash
+git clone https://github.com/GPBK-STUY/treasury-mcp-os.git ~/Desktop/treasury-mcp-os && bash ~/Desktop/treasury-mcp-os/setup.sh
+```
+That's it. The setup script checks Python, installs dependencies, and configures Claude Desktop automatically. Restart Claude Desktop, look for the 🔨 icon, and start asking questions.
 
-Python 3.11+
-pip
+See [QUICKSTART.md](QUICKSTART.md) for the full walkthrough, data setup, and troubleshooting.
 
-Install & Run
-bash# Clone the repo
-git clone https://github.com/GPBK-STUY/treasury-mcp-os.git
-cd treasury-mcp-os
-
-# Install dependencies
-pip install -e .
-
-# Run with MCP Inspector (for testing)
-npx @modelcontextprotocol/inspector python3 server.py
-
-# Or connect to Claude Desktop — add this to your claude_desktop_config.json:
-# {
-#   "mcpServers": {
-#     "treasury-os": {
-#       "command": "python3",
-#       "args": ["/full/path/to/treasury-mcp-os/server.py"]
-#     }
-#   }
-# }
 Test a Tool
-Open MCP Inspector in your browser, connect to the server, and call get_cash_position. You should see balances for Apex Manufacturing Corp across 8 accounts in USD and EUR.
-Then try scan_idle_balances — it'll tell you exactly how much money is sitting there doing nothing and what it's costing per year.
+Open Claude Desktop and ask "What's my current cash position?" You should see balances for Apex Manufacturing Corp across 8 accounts in USD and EUR.
+Then ask "Do I have any idle cash?" — it'll tell you exactly how much money is sitting there doing nothing and what it's costing per year.
 
 Sample Data
 The repo comes with a fictional mid-market client: Apex Manufacturing Corp (~$25M revenue, US and European operations).
@@ -112,9 +97,11 @@ Edit CLAUDE.md. That's the policy manual. Want stricter DSCR thresholds? Change 
 
 File Structure
 treasury-mcp-os/
-├── server.py              ← Entry point. Registers tools. Run this.
+├── server.py              ← Entry point. Registers 9 tools. Run this.
 ├── models.py              ← Data shapes. What each tool returns.
 ├── CLAUDE.md              ← Agent instructions. Banking guardrails.
+├── QUICKSTART.md          ← Setup guide for new users.
+├── setup.sh               ← One-command installer.
 ├── pyproject.toml         ← Project config and dependencies.
 ├── tools/
 │   ├── __init__.py
@@ -124,13 +111,17 @@ treasury-mcp-os/
 │   ├── working_capital.py ← Working capital ratios
 │   ├── payment_optimizer.py ← Payment timing
 │   ├── fx_scanner.py      ← FX exposure
-│   └── covenant_monitor.py ← Covenant compliance
+│   ├── covenant_monitor.py ← Covenant compliance
+│   ├── credit_parser.py   ← Credit report parser
+│   └── credit_assessor.py ← Credit position assessor
 └── sample_data/
     ├── accounts.csv
     ├── transactions.csv
     ├── vendors.csv
     ├── covenants.csv
-    └── fx_rates.csv
+    ├── fx_rates.csv
+    ├── personal_credit.csv
+    └── business_credit.csv
 
 Where This Is Going
 This is V1. The tools work, the math is right, the architecture is clean. But the real play is bigger than a demo.
