@@ -1,8 +1,8 @@
 # TreasuryOS — Quick Start for Business Owners
 
-Your AI-powered CFO assistant. Know exactly where your money is, where it's going, and what you're leaving on the table.
+Your CFO dashboard. Know exactly where your money is, where it's going, and what you're leaving on the table.
 
-No finance degree required. No spreadsheet gymnastics. Just ask questions in plain English.
+No finance degree required. No spreadsheet gymnastics. No AI subscriptions. Just open your browser.
 
 ---
 
@@ -21,55 +21,79 @@ You know that feeling when your accountant sends a report and you think "great, 
 
 ## What You Need
 
-1. **A Mac** (Windows support coming soon)
-2. **Claude Desktop** — download free at [claude.ai/download](https://claude.ai/download)
-3. **Your financial data** as CSV files (details below) — or just try it with the included sample data first
+1. **A Mac or PC** with a web browser
+2. **Your financial data** as CSV files (details below) — or just try it with the included sample data first
+
+That's it. No Claude subscription, no AI account, no special software.
 
 ---
 
 ## Setup (One Command)
 
-Open **Terminal** (press `Cmd + Space`, type "Terminal", hit Enter) and paste this:
+Open **Terminal** (Mac: press `Cmd + Space`, type "Terminal", hit Enter) and paste this:
 
 ```bash
-git clone https://github.com/GPBK-STUY/treasury-mcp-os.git ~/Desktop/treasury-mcp-os && bash ~/Desktop/treasury-mcp-os/setup.sh
+git clone https://github.com/GPBK-STUY/treasury-mcp-os.git ~/Desktop/treasury-mcp-os && cd ~/Desktop/treasury-mcp-os && bash setup.sh && uv run streamlit run app.py
 ```
 
-The script handles everything. When it finishes:
+Your browser will open automatically with the TreasuryOS dashboard.
 
-1. **Quit Claude Desktop completely** (right-click the dock icon → Quit)
-2. **Reopen Claude Desktop**
-3. Look for the **hammer icon** 🔨 in the bottom-right of the chat box
-4. Click it — you should see **TreasuryOS** with 9 tools listed
+**Already set up? Just run:**
+```bash
+cd ~/Desktop/treasury-mcp-os && uv run streamlit run app.py
+```
 
 ---
 
-## Questions to Ask Claude
+## Using the Dashboard
 
-Once TreasuryOS is connected, just talk to Claude like you're talking to a financial advisor. Here are real questions to start with:
+The web dashboard has 10 pages you can navigate from the sidebar:
 
-### Your Cash
-- "Where is all my cash right now? Break it down by account."
-- "Am I leaving money on the table with my current bank accounts?"
-- "What does my cash flow look like for the next 90 days? Any red flags?"
+### Overview
+Your financial snapshot — total cash, idle cash, covenant status, and credit rating all on one screen.
 
-### Your Bills & Vendors
-- "Which vendors are offering me early-pay discounts? Are any of them worth taking?"
-- "Do I have any foreign currency exposure I should worry about?"
+### Cash Position
+Every bank account in one table. See balances by account type and currency.
 
-### Your Debt
-- "Am I in compliance with all my loan covenants?"
-- "How much headroom do I have before I trip a covenant?"
+### Idle Cash
+Find money sitting in checking accounts earning nothing. The tool calculates exactly how much it's costing you per year — and what to do about it.
 
-### Your Credit
-- "Break down my credit reports — personal and business. What do lenders see?"
-- "Based on my cash and credit, how much could I borrow if I needed to?"
-- "What's hurting my credit the most and what should I fix first?"
+### Cash Forecast
+See where your cash is headed over the next 30-365 days. Flags potential shortfalls before they happen.
 
-### The Big Picture
+### Vendor Payments
+Should you pay a vendor early to capture a discount? The tool calculates the annualized return and tells you when it makes sense and when it doesn't.
+
+### FX Exposure
+If you pay any vendors in foreign currency, this shows your unhedged exposure and Value at Risk.
+
+### Debt Covenants
+Green/yellow/red status for every covenant. See your headroom percentage and get warned before you're in trouble.
+
+### Credit Report
+Your personal and business credit broken down — FICO scores, utilization, payment history, derogatories, everything a lender looks at.
+
+### Credit Assessment
+The full picture. Combines your credit, cash position, and covenant data into an overall rating with specific risk factors, lending capacity estimate, and recommendations.
+
+### Working Capital
+Enter your financials manually and get DSO, DPO, cash conversion cycle, current ratio, and runway. Know exactly how healthy your working capital is.
+
+---
+
+## Want AI-Powered Analysis Too?
+
+The web dashboard gives you the numbers. If you also want to have a conversation with AI about your financials — ask follow-up questions, chain analyses together, get plain-English explanations — you can optionally connect TreasuryOS to Claude Desktop.
+
+Run the setup script to configure Claude:
+```bash
+bash ~/Desktop/treasury-mcp-os/setup.sh
+```
+
+Then restart Claude Desktop and ask questions like:
 - "Give me the full financial picture — cash, debt, credit, everything."
-- "If I wanted to apply for a line of credit next quarter, where do I stand?"
 - "What are the top 3 things I should fix in my financial position right now?"
+- "If I wanted to apply for a line of credit next quarter, where do I stand?"
 
 ---
 

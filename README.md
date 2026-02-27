@@ -53,8 +53,14 @@ git clone https://github.com/GPBK-STUY/treasury-mcp-os.git ~/Desktop/treasury-mc
 ```
 That's it. The setup script checks Python, installs dependencies, and configures Claude Desktop automatically. Restart Claude Desktop, look for the 🔨 icon, and start asking questions.
 
-**Bankers & RMs:** See [QUICKSTART.md](QUICKSTART.md) for the full walkthrough, data setup, and troubleshooting.
+**Bankers & RMs:** See [QUICKSTART.md](QUICKSTART.md) — connects to Claude Desktop for AI-powered analysis.
 **Business Owners & Founders:** See [QUICKSTART-OWNERS.md](QUICKSTART-OWNERS.md) — same tool, written for people running the business instead of advising it.
+
+**Just want the dashboard? No Claude needed:**
+```bash
+git clone https://github.com/GPBK-STUY/treasury-mcp-os.git ~/Desktop/treasury-mcp-os && cd ~/Desktop/treasury-mcp-os && uv sync && uv run streamlit run app.py
+```
+Opens a web dashboard in your browser. Upload your CSVs and go.
 
 Test a Tool
 Open Claude Desktop and ask "What's my current cash position?" You should see balances for Apex Manufacturing Corp across 8 accounts in USD and EUR.
@@ -98,7 +104,8 @@ Edit CLAUDE.md. That's the policy manual. Want stricter DSCR thresholds? Change 
 
 File Structure
 treasury-mcp-os/
-├── server.py              ← Entry point. Registers 9 tools. Run this.
+├── server.py              ← MCP entry point. Registers 9 tools. For Claude Desktop.
+├── app.py                 ← Web dashboard. Run: streamlit run app.py
 ├── models.py              ← Data shapes. What each tool returns.
 ├── CLAUDE.md              ← Agent instructions. Banking guardrails.
 ├── QUICKSTART.md          ← Setup guide for bankers & RMs.
