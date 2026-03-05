@@ -76,6 +76,7 @@ class WorkingCapitalMetrics(BaseModel):
     daily_burn_rate: float = Field(..., description="Daily cash burn")
     runway_days: float = Field(..., description="Days of runway")
     assessment: str = Field(..., description="Health assessment")
+    guardrail_warnings: List[str] = Field(default_factory=list, description="Active guardrail flags")
 
 
 class PaymentRecommendation(BaseModel):

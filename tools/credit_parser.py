@@ -78,6 +78,13 @@ def parse_credit_report(data_dir: str) -> dict:
     business_profile = None
     if os.path.exists(business_path):
         df = pd.read_csv(business_path)
+        if len(df) > 1:
+            import warnings as _warnings
+            _warnings.warn(
+                f"business_credit.csv contains {len(df)} rows; only the first row will be parsed. "
+                "Each file should represent a single business entity.",
+                UserWarning, stacklevel=2,
+            )
         if len(df) > 0:
             row = df.iloc[0]
             paydex = int(row["paydex_score"])
@@ -101,7 +108,7 @@ def parse_credit_report(data_dir: str) -> dict:
                 liens=int(row.get("liens", 0)),
                 judgments=int(row.get("judgments", 0)),
                 ucc_filings=int(row.get("ucc_filings", 0)),
-                bankruptcy_flag=str(row.get("bankruptcy_flag", "false")).lower() == "true",
+                bankruptcy_flag=str(row.get("bankruptcy_flag", "false")).strip().lower() in ("true", "1", "yes"),
                 d_and_b_rating=str(row.get("d_and_b_rating", "")),
                 paydex_tier=_paydex_tier(paydex),
             )

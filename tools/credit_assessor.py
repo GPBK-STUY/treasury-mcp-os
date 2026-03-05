@@ -34,15 +34,19 @@ def assess_credit_position(data_dir: str,
     business = credit.get("business_profile", None)
 
     # ── Pull cash and covenant data (existing tools) ───────────────
+    cash_error = None
     try:
         cash = get_cash_position(data_dir)
-    except Exception:
+    except Exception as e:
         cash = None
+        cash_error = str(e)
 
+    covenant_error = None
     try:
         covenants = monitor_debt_covenants(data_dir)
-    except Exception:
+    except Exception as e:
         covenants = None
+        covenant_error = str(e)
 
     # ── Analyze personal credit ────────────────────────────────────
     risk_factors = []
@@ -246,14 +250,53 @@ def assess_credit_position(data_dir: str,
                 recommendation="Verify discharge date, review post-bankruptcy financial performance",
             ))
 
-        if business["liens"] > 0 or business["judgments"] > 0:
+        # Separate tax/judgment liens from normal UCC filings (per CLAUDE.md)
+        if business["judgments"] > 0 or business["liens"] > 0:
             risk_factors.append(CreditRiskFactor(
                 category="business_credit",
-                severity="concern",
-                finding=f"Public records: {business['liens']} lien(s), {business['judgments']} judgment(s)",
-                impact="Liens and judgments affect collateral priority and signal financial distress",
-                recommendation="Verify if liens are satisfied; UCC filings from existing lenders are normal, tax liens are not",
+                severity="critical" if business["liens"] > 0 else "concern",
+                finding=(
+                    f"Public records: {business['liens']} lien(s) "
+                    f"(tax or judgment liens — CRITICAL), "
+                    f"{business['judgments']} judgment(s)"
+                ) if business["liens"] > 0 else (
+                    f"Public records: {business['judgments']} judgment(s)"
+                ),
+                impact="Tax liens are always critical — they supersede lender collateral priority. Judgments signal legal/financial distress.",
+                recommendation=(
+                    "Tax liens must be resolved or subordinated before funding. "
+                    "Obtain lien release or title search. Judgments require written explanation."
+                ) if business["liens"] > 0 else (
+                    "Judgments require written explanation in the underwriting package."
+                ),
             ))
+        # UCC filings from existing lenders are normal and informational only
+        if business["ucc_filings"] > 0 and business["liens"] == 0:
+            risk_factors.append(CreditRiskFactor(
+                category="business_credit",
+                severity="neutral",
+                finding=f"UCC filings on file: {business['ucc_filings']} (existing lender filings)",
+                impact="UCC filings from existing lenders are standard — not a negative signal",
+                recommendation="Confirm filings are from known creditors; note any unexpected filers",
+            ))
+
+    # ── Surface data load errors as risk factors ───────────────────
+    if cash_error:
+        risk_factors.append(CreditRiskFactor(
+            category="data_availability",
+            severity="neutral",
+            finding=f"Cash position data unavailable: {cash_error}",
+            impact="Cash position not included in this assessment",
+            recommendation="Resolve data access issue and re-run assessment for complete picture",
+        ))
+    if covenant_error:
+        risk_factors.append(CreditRiskFactor(
+            category="data_availability",
+            severity="neutral",
+            finding=f"Covenant data unavailable: {covenant_error}",
+            impact="Covenant compliance not included in this assessment",
+            recommendation="Resolve data access issue and re-run assessment for complete picture",
+        ))
 
     # ── Integrate with cash position ───────────────────────────────
     if cash:
@@ -315,25 +358,31 @@ def assess_credit_position(data_dir: str,
             ))
 
     # ── Determine overall rating ───────────────────────────────────
-    severity_scores = {"positive": 0, "neutral": 1, "watch": 2, "concern": 3, "critical": 5}
-    total_severity = sum(severity_scores.get(rf.severity, 1) for rf in risk_factors)
-    num_factors = len(risk_factors) if risk_factors else 1
-    avg_severity = total_severity / num_factors
+    # Guard: if no actionable factors were produced, data was insufficient to rate
+    if not risk_factors:
+        overall = "acceptable"  # conservative default — cannot rate without data
+    else:
+        severity_scores = {"positive": 0, "neutral": 1, "watch": 2, "concern": 3, "critical": 5}
+        total_severity = sum(severity_scores.get(rf.severity, 1) for rf in risk_factors)
+        avg_severity = total_severity / len(risk_factors)
+
+        criticals = sum(1 for rf in risk_factors if rf.severity == "critical")
+        concerns = sum(1 for rf in risk_factors if rf.severity == "concern")
+
+        if criticals >= 2 or avg_severity > 3.0:
+            overall = "adverse"
+        elif criticals >= 1 or avg_severity > 2.5:
+            overall = "weak"
+        elif concerns >= 2 or avg_severity > 1.8:
+            overall = "marginal"
+        elif avg_severity > 1.0:
+            overall = "acceptable"
+        else:
+            overall = "strong"
 
     criticals = sum(1 for rf in risk_factors if rf.severity == "critical")
     concerns = sum(1 for rf in risk_factors if rf.severity == "concern")
     positives = sum(1 for rf in risk_factors if rf.severity == "positive")
-
-    if criticals >= 2 or avg_severity > 3.0:
-        overall = "adverse"
-    elif criticals >= 1 or avg_severity > 2.5:
-        overall = "weak"
-    elif concerns >= 2 or avg_severity > 1.8:
-        overall = "marginal"
-    elif avg_severity > 1.0:
-        overall = "acceptable"
-    else:
-        overall = "strong"
 
     # ── Personal guaranty strength ─────────────────────────────────
     if lowest_score >= 700 and combined_dti is not None and combined_dti < 36:
@@ -377,10 +426,12 @@ def assess_credit_position(data_dir: str,
 
     # ── Build recommendation ───────────────────────────────────────
     if overall == "strong":
+        summary_parts = [f"Average guarantor FICO {avg_score:.0f}"]
+        if biz_paydex:
+            summary_parts.append(f"Paydex {biz_paydex}")
+        summary_parts.append("clean covenant history")
         rec = (f"Strong credit profile across personal and business dimensions. "
-               f"Average guarantor FICO {avg_score:.0f}, "
-               f"{'Paydex ' + str(biz_paydex) + ', ' if biz_paydex else ''}"
-               f"clean covenant history. Proceed with standard underwriting. "
+               f"{', '.join(summary_parts)}. Proceed with standard underwriting. "
                f"Explore cross-sell opportunities to deepen the relationship.")
     elif overall == "acceptable":
         watch_items = [rf.finding for rf in risk_factors if rf.severity == "watch"]

@@ -24,7 +24,7 @@ def scan_fx_exposure(data_dir: str) -> dict:
         elif base == "USD":
             fx_to_usd[quote] = 1.0/rate  # USD/JPY=149 -> 1 JPY = 1/149 USD
 
-    ref_date = datetime(2026, 2, 8)
+    ref_date = datetime.today()
     exposures = []
     total_unhedged = 0.0
     total_var = 0.0
@@ -58,13 +58,26 @@ def scan_fx_exposure(data_dir: str) -> dict:
 
     largest = max(by_currency, key=by_currency.get) if by_currency else ""
 
+    # Guardrail flags (per CLAUDE.md): single > $500k or total > $1M = explicit flag
+    largest_single_usd = max(by_currency.values()) if by_currency else 0
+    flags = []
+    if largest_single_usd > 500_000:
+        flags.append(
+            f"FLAG: Single-currency exposure ({largest} ${largest_single_usd:,.0f}) exceeds $500K guardrail threshold."
+        )
+    if total_unhedged > 1_000_000:
+        flags.append(
+            f"FLAG: Total unhedged exposure ${total_unhedged:,.0f} exceeds $1M guardrail threshold."
+        )
+
     if total_unhedged == 0:
         rec = "No foreign currency exposures detected."
-    elif total_unhedged < 100000:
+    elif total_unhedged < 100_000:
         rec = f"Minimal FX exposure (${total_unhedged:,.2f}). Natural hedging may suffice."
     else:
-        rec = (f"Significant FX exposure (${total_unhedged:,.2f}, ${total_var:,.2f} VaR). "
-               f"Recommend hedging program. Largest: {largest}.")
+        flag_prefix = " ".join(flags) + " " if flags else ""
+        rec = (f"{flag_prefix}Total unhedged FX: ${total_unhedged:,.2f} (${total_var:,.2f} VaR). "
+               f"Recommend hedging program. Largest exposure: {largest}.")
 
     return FXExposureReport(
         exposures=exposures, total_unhedged_usd=round(total_unhedged, 2),

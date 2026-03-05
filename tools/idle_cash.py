@@ -7,6 +7,13 @@ from models import IdleCashOpportunity, IdleCashReport
 def scan_idle_balances(data_dir: str, operating_reserve_pct: float = 0.20,
                        target_yield_bps: int = 450) -> dict:
     """Scan accounts for idle cash that could earn higher yields."""
+    # Guardrail: never deploy below 20% operating reserve (per CLAUDE.md)
+    if operating_reserve_pct < 0.20:
+        raise ValueError(
+            f"operating_reserve_pct={operating_reserve_pct:.0%} violates the minimum 20% "
+            f"operating reserve guardrail. Pass at least 0.20 to protect operating liquidity."
+        )
+
     df = pd.read_csv(os.path.join(data_dir, "accounts.csv"))
     opportunities = []
 

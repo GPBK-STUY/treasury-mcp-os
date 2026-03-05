@@ -10,7 +10,6 @@ def optimize_payment_timing(data_dir: str, available_cash: float = 0.0) -> dict:
     df = pd.read_csv(os.path.join(data_dir, "vendors.csv"))
     recommendations = []
     total_discounts = 0.0
-    total_early_spend = 0.0
 
     for _, row in df.iterrows():
         raw = row.get("discount_terms", "")
@@ -18,7 +17,8 @@ def optimize_payment_timing(data_dir: str, available_cash: float = 0.0) -> dict:
             continue
         terms = str(raw).strip()
 
-        match = re.match(r"(\d+\.?\d*)/(\d+)\s+net\s+(\d+)", terms, re.IGNORECASE)
+        # Allow optional whitespace around "net" (handles both "2/10 net 30" and "2/10net30")
+        match = re.match(r"(\d+\.?\d*)/(\d+)\s*net\s*(\d+)", terms, re.IGNORECASE)
         if not match:
             continue
 
@@ -51,14 +51,37 @@ def optimize_payment_timing(data_dir: str, available_cash: float = 0.0) -> dict:
             reasoning=reasoning,
         ))
         total_discounts += discount_amt
-        if rec_type == "pay_early":
-            total_early_spend += amount
 
+    # Sort by highest annualized return first — highest ROI gets funded first
     recommendations.sort(key=lambda x: x.annualized_return_pct, reverse=True)
+
+    # Apply available_cash budget: walk sorted list and cap pay_early by cash available
+    total_early_spend = 0.0
+    if available_cash > 0:
+        for rec in recommendations:
+            if rec.recommendation == "pay_early":
+                if total_early_spend + rec.invoice_amount <= available_cash:
+                    total_early_spend += rec.invoice_amount
+                else:
+                    # Downgrade — not enough cash remaining for this invoice
+                    rec.recommendation = "hold"
+                    rec.reasoning += (
+                        f" However, insufficient cash budget remaining "
+                        f"(${available_cash - total_early_spend:,.0f} left of ${available_cash:,.0f} budget)."
+                    )
+    else:
+        total_early_spend = sum(
+            r.invoice_amount for r in recommendations if r.recommendation == "pay_early"
+        )
+
+    # Annualized savings: sum of discounts captured × 12 months (assumes similar monthly volume)
+    captured_discounts = sum(
+        r.discount_amount for r in recommendations if r.recommendation == "pay_early"
+    )
 
     return PaymentOptimizationReport(
         recommendations=recommendations,
         total_discount_available=round(total_discounts, 2),
-        total_annualized_savings=round(total_discounts * 12, 2),
+        total_annualized_savings=round(captured_discounts * 12, 2),
         cash_required_for_early_payments=round(total_early_spend, 2),
     ).model_dump()
