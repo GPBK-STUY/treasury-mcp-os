@@ -1,0 +1,38 @@
+date,account_id,description,amount,category
+2025-11-01,BR-ACCT-001,Daily Revenue Deposit,18500.00,revenue
+2025-11-02,BR-ACCT-001,Sysco Inventory,-8500.00,ap_payment
+2025-11-03,BR-ACCT-001,Payroll,-12000.00,payroll
+2025-11-05,BR-ACCT-001,US Foods Supply,-6200.00,ap_payment
+2025-11-07,BR-ACCT-001,Daily Revenue Deposit,22100.00,revenue
+2025-11-08,BR-ACCT-001,Linen Service,-450.00,operating_expense
+2025-11-10,BR-ACCT-001,Rent Payment,-5000.00,operating_expense
+2025-11-12,BR-ACCT-001,Daily Revenue Deposit,19800.00,revenue
+2025-11-15,BR-ACCT-001,Payroll,-12000.00,payroll
+2025-11-18,BR-ACCT-001,Daily Revenue Deposit,21200.00,revenue
+2025-11-19,BR-ACCT-001,Sysco Inventory,-7800.00,ap_payment
+2025-11-22,BR-ACCT-001,Utilities Payment,-1200.00,operating_expense
+2025-11-24,BR-ACCT-001,Daily Revenue Deposit,24500.00,revenue
+2025-11-28,BR-ACCT-001,Payroll,-12000.00,payroll
+2025-12-01,BR-ACCT-001,Daily Revenue Deposit,23100.00,revenue
+2025-12-03,BR-ACCT-001,US Foods Supply,-5950.00,ap_payment
+2025-12-06,BR-ACCT-001,Payroll,-12000.00,payroll
+2025-12-09,BR-ACCT-001,Daily Revenue Deposit,25600.00,revenue
+2025-12-11,BR-ACCT-001,Linen Service,-450.00,operating_expense
+2025-12-13,BR-ACCT-001,Rent Payment,-5000.00,operating_expense
+2025-12-15,BR-ACCT-001,Daily Revenue Deposit,26800.00,revenue
+2025-12-17,BR-ACCT-001,Sysco Inventory,-8100.00,ap_payment
+2025-12-21,BR-ACCT-001,Payroll,-12000.00,payroll
+2025-12-23,BR-ACCT-001,Daily Revenue Deposit,28900.00,revenue
+2025-12-28,BR-ACCT-001,SBA Loan Payment,-2500.00,debt_service
+2026-01-02,BR-ACCT-001,Daily Revenue Deposit,17800.00,revenue
+2026-01-04,BR-ACCT-001,US Foods Supply,-6100.00,ap_payment
+2026-01-06,BR-ACCT-001,Payroll,-12000.00,payroll
+2026-01-09,BR-ACCT-001,Daily Revenue Deposit,20300.00,revenue
+2026-01-12,BR-ACCT-001,Linen Service,-450.00,operating_expense
+2026-01-15,BR-ACCT-001,Rent Payment,-5000.00,operating_expense
+2026-01-18,BR-ACCT-001,Daily Revenue Deposit,22700.00,revenue
+2026-01-20,BR-ACCT-001,Sysco Inventory,-8300.00,ap_payment
+2026-01-27,BR-ACCT-001,Payroll,-12000.00,payroll
+2026-02-01,BR-ACCT-001,Daily Revenue Deposit,21500.00,revenue
+2026-02-03,BR-ACCT-001,US Foods Supply,-6050.00,ap_payment
+2026-02-06,BR-ACCT-001,Payroll,-12000.00,payroll

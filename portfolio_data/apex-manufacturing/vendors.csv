@@ -1,0 +1,11 @@
+vendor_id,vendor_name,payment_terms,discount_terms,outstanding_amount,currency,due_date
+V-001,Alcoa Raw Materials,net_30,2/10 net 30,285000.00,USD,2026-02-25
+V-002,Siemens Industrial,net_45,,175000.00,EUR,2026-03-10
+V-003,Grainger Supply,net_30,1.5/10 net 30,42000.00,USD,2026-02-20
+V-004,FedEx Logistics,net_15,,28500.00,USD,2026-02-15
+V-005,Munich Re Insurance,net_60,,95000.00,EUR,2026-03-30
+V-006,US Steel Corp,net_30,2/10 net 30,310000.00,USD,2026-03-01
+V-007,Eaton Electrical,net_45,1/15 net 45,67000.00,USD,2026-03-05
+V-008,SAP Licensing,net_30,,125000.00,USD,2026-02-28
+V-009,Mitsubishi Components,net_60,,198000.00,JPY,2026-04-01
+V-010,Local Utilities Co,net_15,,8500.00,USD,2026-02-14

@@ -1,0 +1,4 @@
+account_id,bank_name,account_type,currency,balance,yield_rate_bps,last_updated
+CL-ACCT-001,PNC Bank,checking,USD,450000.00,0,2026-02-07
+CL-ACCT-002,PNC Bank,savings,USD,200000.00,115,2026-02-07
+CL-ACCT-003,PNC Bank,money_market,USD,800000.00,420,2026-02-07

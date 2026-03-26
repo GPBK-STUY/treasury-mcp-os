@@ -1,0 +1,5 @@
+vendor_id,vendor_name,payment_terms,discount_terms,outstanding_amount,currency,due_date
+CL-V-001,Pilot Flying J Fuel,net_15,,48500.00,USD,2026-02-20
+CL-V-002,Michelin Tire Distributor,net_30,1/15 net 30,18200.00,USD,2026-03-01
+CL-V-003,Goodyear Tires,net_30,1/15 net 30,14500.00,USD,2026-02-28
+CL-V-004,Shell Fuel Suppliers,net_15,,22800.00,USD,2026-02-18

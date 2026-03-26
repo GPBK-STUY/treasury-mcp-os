@@ -240,7 +240,8 @@ with st.sidebar:
     page = st.radio("nav", [
         "Overview", "Cash Position", "Idle Cash", "Cash Forecast",
         "Payments", "FX Exposure", "Covenants",
-        "Credit Report", "Credit Assessment", "Working Capital"
+        "Credit Report", "Credit Assessment", "Working Capital",
+        "Financing Readiness"
     ], label_visibility="collapsed")
 
     st.markdown("---")
@@ -676,3 +677,431 @@ elif page == "Working Capital":
 
             if data.get("runway_days", 999) < 90:
                 st.warning(f'Runway is only {data["runway_days"]:.0f} days. Consider accelerating collections.')
+
+
+# ═══════════════════════════════════════════════════════════
+#  FINANCING READINESS
+# ═══════════════════════════════════════════════════════════
+elif page == "Financing Readiness":
+    st.markdown(f'<div class="top-bar"><div><div class="top-bar-title">Financing Readiness</div><div class="top-bar-sub">How a bank will evaluate your business &middot; {NOW}</div></div></div>', unsafe_allow_html=True)
+
+    # ── Collect all data ──
+    cash, cash_e = run_safe(get_cash_position, DATA)
+    idle, idle_e = run_safe(scan_idle_balances, DATA)
+    cov, cov_e = run_safe(monitor_debt_covenants, DATA)
+    credit, credit_e = run_safe(parse_credit_report, DATA)
+    assessment, assess_e = run_safe(assess_credit_position, DATA)
+
+    # ── Optional working capital inputs ──
+    with st.expander("Enter Working Capital Details (optional — improves accuracy)"):
+        wc_c1, wc_c2 = st.columns(2)
+        with wc_c1:
+            fr_current_assets = st.number_input("Current Assets ($)", min_value=0, value=0, step=100_000, key="fr_ca")
+            fr_accounts_receivable = st.number_input("Accounts Receivable ($)", min_value=0, value=0, step=100_000, key="fr_ar")
+            fr_annual_revenue = st.number_input("Annual Revenue ($)", min_value=0, value=0, step=500_000, key="fr_rev")
+        with wc_c2:
+            fr_current_liabilities = st.number_input("Current Liabilities ($)", min_value=0, value=0, step=100_000, key="fr_cl")
+            fr_accounts_payable = st.number_input("Accounts Payable ($)", min_value=0, value=0, step=100_000, key="fr_ap")
+            fr_annual_cogs = st.number_input("Annual COGS ($)", min_value=0, value=0, step=500_000, key="fr_cogs")
+
+    wc_data = None
+    if fr_current_assets > 0 and fr_current_liabilities > 0 and fr_annual_revenue > 0:
+        wc_data, _ = run_safe(analyze_working_capital,
+                              float(fr_current_assets), float(fr_current_liabilities),
+                              float(fr_annual_revenue), float(fr_accounts_receivable),
+                              float(fr_accounts_payable), float(fr_annual_cogs))
+
+    # ════════════════════════════════════════════════════════
+    #  SCORING ENGINE
+    # ════════════════════════════════════════════════════════
+    scores = {}       # category -> {"score": 0-100, "weight": float, "status": str, "findings": [str], "actions": [str]}
+    max_score = 100
+
+    # ── 1. Personal Credit (25%) ──
+    pc_score = 0
+    pc_findings = []
+    pc_actions = []
+    if credit and credit.get("personal_profiles"):
+        p = credit["personal_profiles"][0]
+        fico = p.get("credit_score", 0)
+        util = p.get("revolving_utilization_pct", 100)
+        derogs = p.get("derogatory_marks", 0)
+        late30 = p.get("late_payments_30d", 0)
+        late60 = p.get("late_payments_60d", 0)
+        late90 = p.get("late_payments_90d", 0)
+
+        # FICO scoring (0-40 pts)
+        if fico >= 750: pc_score += 40; pc_findings.append(f"FICO {fico} — excellent, qualifies for best rates")
+        elif fico >= 700: pc_score += 30; pc_findings.append(f"FICO {fico} — good, qualifies for conventional lending")
+        elif fico >= 680: pc_score += 20; pc_findings.append(f"FICO {fico} — fair, may face higher rates")
+        elif fico >= 640: pc_score += 10; pc_findings.append(f"FICO {fico} — below threshold for most conventional loans"); pc_actions.append("Focus on raising FICO above 680 before applying — pay down balances, dispute errors")
+        else: pc_findings.append(f"FICO {fico} — will limit you to SBA or secured lending"); pc_actions.append("Delay financing applications until FICO improves above 640")
+
+        # Utilization (0-25 pts)
+        if util <= 20: pc_score += 25; pc_findings.append(f"Utilization {util:.0f}% — excellent")
+        elif util <= 30: pc_score += 20; pc_findings.append(f"Utilization {util:.0f}% — good")
+        elif util <= 50: pc_score += 10; pc_findings.append(f"Utilization {util:.0f}% — banks prefer under 30%"); pc_actions.append(f"Pay down revolving balances to get utilization under 30% (currently {util:.0f}%)")
+        else: pc_findings.append(f"Utilization {util:.0f}% — too high, will hurt your application"); pc_actions.append(f"Reduce revolving utilization from {util:.0f}% to under 30% before applying")
+
+        # Payment history (0-25 pts)
+        total_lates = late30 + late60 + late90
+        if total_lates == 0 and derogs == 0: pc_score += 25; pc_findings.append("Clean payment history — no lates or derogatory marks")
+        elif total_lates <= 1 and derogs == 0: pc_score += 15; pc_findings.append(f"{total_lates} late payment on file")
+        else:
+            if total_lates > 0: pc_findings.append(f"{total_lates} late payments ({late30}x30d, {late60}x60d, {late90}x90d)")
+            if derogs > 0: pc_findings.append(f"{derogs} derogatory mark(s) on file"); pc_actions.append("Address derogatory marks — negotiate pay-for-delete or dispute inaccuracies")
+
+        # Inquiries (0-10 pts)
+        inquiries = p.get("recent_inquiries_6mo", 0)
+        if inquiries <= 2: pc_score += 10
+        elif inquiries <= 4: pc_score += 5; pc_findings.append(f"{inquiries} recent inquiries — banks may see you as rate-shopping")
+        else: pc_findings.append(f"{inquiries} recent inquiries — stop applying for credit until you're ready"); pc_actions.append("Avoid new credit applications for 6 months before applying for business financing")
+    else:
+        pc_findings.append("No personal credit data loaded")
+        pc_actions.append("Upload your personal credit report to get a full readiness assessment")
+
+    scores["Personal Credit"] = {"score": pc_score, "weight": 0.25, "findings": pc_findings, "actions": pc_actions}
+
+    # ── 2. Business Credit (20%) ──
+    bc_score = 0
+    bc_findings = []
+    bc_actions = []
+    if credit and credit.get("business_profile"):
+        bp = credit["business_profile"]
+        paydex = bp.get("paydex_score", 0)
+        yrs = bp.get("years_in_business", 0)
+        dbt = bp.get("days_beyond_terms_avg", 99)
+        derogs_biz = bp.get("derogatory_count", 0)
+        liens = bp.get("liens", 0)
+        judgments = bp.get("judgments", 0)
+
+        # Paydex (0-35 pts)
+        if paydex >= 80: bc_score += 35; bc_findings.append(f"Paydex {paydex} — strong, pays on or ahead of terms")
+        elif paydex >= 70: bc_score += 25; bc_findings.append(f"Paydex {paydex} — good but room to improve")
+        elif paydex >= 50: bc_score += 10; bc_findings.append(f"Paydex {paydex} — below average"); bc_actions.append("Pay all vendors early or on time for 3-6 months to boost Paydex above 70")
+        else: bc_findings.append(f"Paydex {paydex} — poor, banks will flag this"); bc_actions.append("Establish vendor trade lines that report to D&B and pay them early")
+
+        # Years in business (0-25 pts)
+        if yrs >= 5: bc_score += 25; bc_findings.append(f"{yrs} years in business — meets all lender minimums")
+        elif yrs >= 2: bc_score += 15; bc_findings.append(f"{yrs} years in business — meets most conventional lender minimums")
+        elif yrs >= 1: bc_score += 5; bc_findings.append(f"{yrs} year(s) — some lenders require 2+ years"); bc_actions.append("Consider SBA microloans or community lenders who serve newer businesses")
+        else: bc_findings.append("Under 1 year — most conventional lenders require 2+ years"); bc_actions.append("Build operating history before applying — focus on SBA Microloans or startup-friendly lenders")
+
+        # Days beyond terms (0-20 pts)
+        if dbt <= 5: bc_score += 20
+        elif dbt <= 15: bc_score += 10; bc_findings.append(f"Averaging {dbt:.0f} days beyond terms — tighten up vendor payments")
+        else: bc_findings.append(f"Averaging {dbt:.0f} days beyond terms — this signals cash flow stress to banks"); bc_actions.append(f"Get days-beyond-terms under 10 (currently {dbt:.0f})")
+
+        # Public records (0-20 pts)
+        if liens == 0 and judgments == 0 and derogs_biz == 0:
+            bc_score += 20; bc_findings.append("No liens, judgments, or derogatory records")
+        else:
+            if judgments > 0: bc_findings.append(f"{judgments} judgment(s) on file — major red flag for lenders"); bc_actions.append("Resolve outstanding judgments before applying")
+            if liens > 0: bc_findings.append(f"{liens} lien(s) on file"); bc_actions.append("Address outstanding liens — these appear on UCC searches")
+            if derogs_biz > 0: bc_findings.append(f"{derogs_biz} derogatory item(s) on business credit")
+    else:
+        bc_findings.append("No business credit data loaded")
+        bc_actions.append("Upload your business credit report (Dun & Bradstreet, Experian Business) for a complete assessment")
+
+    scores["Business Credit"] = {"score": bc_score, "weight": 0.20, "findings": bc_findings, "actions": bc_actions}
+
+    # ── 3. Cash Position & Runway (20%) ──
+    cp_score = 0
+    cp_findings = []
+    cp_actions = []
+    if cash:
+        total_cash = cash.get("total_balance", 0)
+        num_accounts = len(cash.get("accounts", []))
+
+        # Cash level (0-40 pts) — context-dependent
+        if total_cash >= 500_000: cp_score += 40; cp_findings.append(f"Cash position {fmt(total_cash)} — strong liquidity")
+        elif total_cash >= 100_000: cp_score += 25; cp_findings.append(f"Cash position {fmt(total_cash)} — adequate for most small business loans")
+        elif total_cash >= 25_000: cp_score += 10; cp_findings.append(f"Cash position {fmt(total_cash)} — thin for conventional lending"); cp_actions.append("Build cash reserves to at least 3 months of operating expenses before applying")
+        else: cp_findings.append(f"Cash position {fmt(total_cash)} — banks want to see you can cover payments"); cp_actions.append("Accumulate cash reserves — lenders want to see 3-6 months of runway")
+
+        # Multiple accounts (0-10 pts)
+        if num_accounts >= 2: cp_score += 10; cp_findings.append(f"{num_accounts} accounts — shows banking relationship depth")
+        else: cp_findings.append("Single account — consider opening a business savings account to show financial discipline")
+
+        # Idle cash penalty/bonus (0-20 pts)
+        if idle:
+            idle_pct = idle.get("total_idle_cash", 0) / max(total_cash, 1) * 100
+            if idle_pct < 20: cp_score += 20; cp_findings.append("Cash is well-deployed across account types")
+            elif idle_pct < 50: cp_score += 10; cp_findings.append(f"{idle_pct:.0f}% of cash sitting idle — move to higher-yield accounts"); cp_actions.append("Move idle cash to money market or high-yield savings before applying — shows financial sophistication")
+            else: cp_findings.append(f"{idle_pct:.0f}% of cash idle in low-yield accounts"); cp_actions.append("Optimize cash allocation — bankers notice when businesses leave money in 0% checking")
+
+        # Deposit trend (0-30 pts) — use forecast as proxy
+        forecast, _ = run_safe(forecast_cash_position, DATA, 90)
+        if forecast and forecast.get("projections"):
+            last_proj = forecast["projections"][-1]
+            ending = last_proj.get("ending_balance", 0)
+            if ending >= total_cash * 0.9: cp_score += 30; cp_findings.append("90-day forecast shows stable or growing cash position")
+            elif ending >= total_cash * 0.7: cp_score += 15; cp_findings.append("Cash forecast shows moderate decline over 90 days"); cp_actions.append("Ensure cash position is stable or growing when you apply — banks look at trends")
+            else: cp_findings.append("Cash forecast shows significant decline"); cp_actions.append("Address cash burn before applying — banks will see the downward trend")
+            if forecast.get("deficit_periods"):
+                cp_findings.append(f"Potential shortfall periods: {', '.join(forecast['deficit_periods'])}")
+                cp_actions.append("Resolve projected cash shortfalls before applying")
+    else:
+        cp_findings.append("No cash position data loaded")
+        cp_actions.append("Upload accounts.csv and transactions.csv for cash analysis")
+
+    scores["Cash & Runway"] = {"score": cp_score, "weight": 0.20, "findings": cp_findings, "actions": cp_actions}
+
+    # ── 4. Working Capital (15%) ──
+    wc_score = 0
+    wc_findings = []
+    wc_actions = []
+    if wc_data:
+        cr = wc_data.get("current_ratio", 0)
+        dso = wc_data.get("days_sales_outstanding", 0)
+        ccc = wc_data.get("cash_conversion_cycle_days", 0)
+        runway = wc_data.get("runway_days", 0)
+
+        # Current ratio (0-35 pts)
+        if cr >= 2.0: wc_score += 35; wc_findings.append(f"Current ratio {cr:.2f}x — strong, exceeds bank requirements")
+        elif cr >= 1.5: wc_score += 25; wc_findings.append(f"Current ratio {cr:.2f}x — healthy")
+        elif cr >= 1.2: wc_score += 15; wc_findings.append(f"Current ratio {cr:.2f}x — adequate but tight"); wc_actions.append("Improve current ratio above 1.5x by reducing short-term liabilities or building current assets")
+        elif cr >= 1.0: wc_score += 5; wc_findings.append(f"Current ratio {cr:.2f}x — banks prefer above 1.25x"); wc_actions.append(f"Current ratio of {cr:.2f}x is borderline — focus on building it above 1.5x")
+        else: wc_findings.append(f"Current ratio {cr:.2f}x — below 1.0 means liabilities exceed current assets"); wc_actions.append("Address negative working capital immediately — this will block most financing")
+
+        # DSO (0-25 pts)
+        if dso <= 30: wc_score += 25; wc_findings.append(f"DSO {dso:.0f} days — excellent collection speed")
+        elif dso <= 45: wc_score += 15; wc_findings.append(f"DSO {dso:.0f} days — acceptable")
+        elif dso <= 60: wc_score += 5; wc_findings.append(f"DSO {dso:.0f} days — slow collections concern banks"); wc_actions.append(f"Reduce DSO from {dso:.0f} to under 45 days — tighten payment terms, offer early-pay discounts")
+        else: wc_findings.append(f"DSO {dso:.0f} days — very slow, indicates collection problems"); wc_actions.append(f"DSO of {dso:.0f} days is a red flag — implement stricter AR management immediately")
+
+        # Cash conversion cycle (0-20 pts)
+        if ccc <= 30: wc_score += 20; wc_findings.append(f"Cash conversion cycle {ccc:.0f} days — efficient")
+        elif ccc <= 60: wc_score += 10; wc_findings.append(f"Cash conversion cycle {ccc:.0f} days — moderate")
+        else: wc_findings.append(f"Cash conversion cycle {ccc:.0f} days — cash is tied up too long"); wc_actions.append("Shorten cash conversion cycle by collecting faster and negotiating longer vendor terms")
+
+        # Runway (0-20 pts)
+        if runway >= 180: wc_score += 20; wc_findings.append(f"Runway {runway:.0f} days — strong buffer")
+        elif runway >= 90: wc_score += 10; wc_findings.append(f"Runway {runway:.0f} days — adequate")
+        else: wc_findings.append(f"Runway only {runway:.0f} days — banks want 90+ days"); wc_actions.append(f"Build runway from {runway:.0f} to 90+ days before applying")
+    else:
+        wc_findings.append("No working capital data provided — enter values above for a complete assessment")
+        wc_actions.append("Fill in the working capital fields above for a more accurate readiness score")
+
+    scores["Working Capital"] = {"score": wc_score, "weight": 0.15, "findings": wc_findings, "actions": wc_actions}
+
+    # ── 5. Existing Debt & Covenants (10%) ──
+    debt_score = 0
+    debt_findings = []
+    debt_actions = []
+    if cov:
+        overall = cov.get("overall_status", "unknown")
+        breaches = cov.get("breaches", 0)
+        warnings = cov.get("warnings", 0)
+
+        if overall == "compliant" and breaches == 0 and warnings == 0:
+            debt_score = 100; debt_findings.append("All covenants compliant with no warnings — clean record")
+        elif overall == "compliant" and warnings > 0:
+            debt_score = 60; debt_findings.append(f"Compliant but {warnings} warning(s) — banks will ask about these"); debt_actions.append("Improve covenant headroom on warning items before seeking new debt")
+        elif breaches > 0:
+            debt_findings.append(f"{breaches} covenant breach(es) — this will likely block new financing")
+            debt_actions.append("Resolve all covenant breaches before applying — lenders check existing facility compliance")
+            if cov.get("covenants"):
+                for c in cov["covenants"]:
+                    if c.get("status") == "breach":
+                        debt_findings.append(f"Breach: {c['covenant_name']} (headroom: {c['headroom_pct']:.1f}%)")
+    else:
+        debt_score = 70  # No existing debt is actually okay
+        debt_findings.append("No existing debt covenants on file")
+
+    scores["Existing Debt"] = {"score": debt_score, "weight": 0.10, "findings": debt_findings, "actions": debt_actions}
+
+    # ── 6. Documentation Readiness (10%) ──
+    doc_score = 0
+    doc_findings = []
+    doc_actions = []
+    doc_checklist = {
+        "Bank statements (accounts.csv)": cash is not None,
+        "Transaction history (transactions.csv)": cash is not None,  # loaded together
+        "Personal credit report": credit is not None and bool(credit.get("personal_profiles")),
+        "Business credit report": credit is not None and bool(credit.get("business_profile")),
+        "Debt/covenant schedule": cov is not None,
+        "Vendor/AP aging": idle is not None,  # vendors loaded for payment optimizer
+        "Working capital data": wc_data is not None,
+    }
+    docs_present = sum(1 for v in doc_checklist.values() if v)
+    docs_total = len(doc_checklist)
+    doc_score = int((docs_present / docs_total) * 100)
+    doc_findings.append(f"{docs_present} of {docs_total} key documents loaded")
+    missing = [k for k, v in doc_checklist.items() if not v]
+    if missing:
+        doc_actions.append(f"Still needed: {', '.join(missing)}")
+
+    scores["Documentation"] = {"score": doc_score, "weight": 0.10, "findings": doc_findings, "actions": doc_actions}
+
+    # ════════════════════════════════════════════════════════
+    #  CALCULATE OVERALL SCORE
+    # ════════════════════════════════════════════════════════
+    overall_score = sum(s["score"] * s["weight"] for s in scores.values())
+    # Normalize: each category max is 100, so weighted sum max is 100
+    overall_score = min(overall_score, 100)
+
+    if overall_score >= 75: overall_status = "strong"
+    elif overall_score >= 55: overall_status = "fair"
+    elif overall_score >= 35: overall_status = "needs_work"
+    else: overall_status = "not_ready"
+
+    # ════════════════════════════════════════════════════════
+    #  DISPLAY: OVERALL SCORE
+    # ════════════════════════════════════════════════════════
+    score_color = GREEN if overall_score >= 75 else YELLOW if overall_score >= 50 else RED
+
+    st.markdown(f"""<div class="card" style="text-align:center;padding:2rem;">
+<div class="card-header">FINANCING READINESS SCORE</div>
+<div style="font-size:4rem;font-weight:800;color:{score_color};line-height:1;">{overall_score:.0f}</div>
+<div style="font-size:1rem;color:{TEXT_SECONDARY};margin-top:0.5rem;">out of 100</div>
+<div style="margin-top:1rem;">{tag_html(overall_status)}</div>
+</div>""", unsafe_allow_html=True)
+
+    # ════════════════════════════════════════════════════════
+    #  DISPLAY: CATEGORY BREAKDOWN
+    # ════════════════════════════════════════════════════════
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    st.markdown("### Category Scores")
+
+    for cat_name, cat_data in scores.items():
+        cat_score = cat_data["score"]
+        cat_weight = cat_data["weight"]
+        cat_weighted = cat_score * cat_weight
+        if cat_score >= 70: cat_status = "strong"
+        elif cat_score >= 40: cat_status = "fair"
+        else: cat_status = "weak"
+
+        with st.expander(f"{cat_name} — {cat_score}/100 ({cat_weight*100:.0f}% weight)"):
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Raw Score", f"{cat_score}/100")
+            c2.metric("Weight", f"{cat_weight*100:.0f}%")
+            c3.metric("Weighted", f"{cat_weighted:.0f} pts")
+
+            if cat_data["findings"]:
+                st.markdown("**Findings:**")
+                findings_html = ""
+                for f in cat_data["findings"]:
+                    findings_html += status_html(cat_status, f)
+                st.markdown(f'<div class="card">{findings_html}</div>', unsafe_allow_html=True)
+
+            if cat_data["actions"]:
+                st.markdown("**Action Items:**")
+                for a in cat_data["actions"]:
+                    st.markdown(f"- {a}")
+
+    # ════════════════════════════════════════════════════════
+    #  DISPLAY: TOP ACTIONS (PRIORITIZED)
+    # ════════════════════════════════════════════════════════
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    st.markdown("### Top Actions Before Applying")
+
+    all_actions = []
+    priority_order = ["Personal Credit", "Business Credit", "Cash & Runway", "Existing Debt", "Working Capital", "Documentation"]
+    for cat in priority_order:
+        if cat in scores:
+            for action in scores[cat]["actions"]:
+                all_actions.append({"category": cat, "action": action, "score": scores[cat]["score"]})
+
+    # Sort by lowest score first (most urgent)
+    all_actions.sort(key=lambda x: x["score"])
+
+    if all_actions:
+        for i, item in enumerate(all_actions[:8], 1):
+            urgency = "weak" if item["score"] < 30 else "fair" if item["score"] < 60 else "strong"
+            action_text = item["action"]
+            cat_text = item["category"]
+            st.markdown(status_html(urgency, f"{i}. {action_text}", cat_text), unsafe_allow_html=True)
+    else:
+        st.markdown(f'{status_html("strong", "You look ready — no major issues found")}', unsafe_allow_html=True)
+
+    # ════════════════════════════════════════════════════════
+    #  DISPLAY: LOAN PRODUCT MATCHER
+    # ════════════════════════════════════════════════════════
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    st.markdown("### Loan Products You May Qualify For")
+
+    fico_score = 0
+    if credit and credit.get("personal_profiles"):
+        fico_score = credit["personal_profiles"][0].get("credit_score", 0)
+
+    paydex_score = 0
+    yrs_in_biz = 0
+    if credit and credit.get("business_profile"):
+        paydex_score = credit["business_profile"].get("paydex_score", 0)
+        yrs_in_biz = credit["business_profile"].get("years_in_business", 0)
+
+    total_cash_val = cash.get("total_balance", 0) if cash else 0
+    has_breach = cov.get("breaches", 0) > 0 if cov else False
+
+    products = []
+
+    # Conventional Line of Credit
+    if fico_score >= 680 and yrs_in_biz >= 2 and not has_breach:
+        rate = "Prime + 1-3%" if fico_score >= 720 else "Prime + 2-5%"
+        products.append({"name": "Conventional Line of Credit", "likelihood": "strong", "rate": rate,
+                         "detail": "Revolving credit for working capital needs. Requires strong personal credit and 2+ years in business."})
+    elif fico_score >= 640:
+        products.append({"name": "Conventional Line of Credit", "likelihood": "fair", "rate": "Prime + 3-6%",
+                         "detail": "Possible but may require additional collateral or higher rates due to credit profile."})
+
+    # SBA 7(a)
+    if fico_score >= 640 and yrs_in_biz >= 1:
+        products.append({"name": "SBA 7(a) Loan", "likelihood": "strong" if fico_score >= 680 else "fair",
+                         "rate": "Prime + 2.25-4.75%",
+                         "detail": "Government-backed loan up to $5M. Longer terms and lower rates than conventional. 2-3 month process."})
+
+    # SBA Microloan
+    if yrs_in_biz >= 0:  # Available to startups
+        products.append({"name": "SBA Microloan", "likelihood": "strong", "rate": "6-9%",
+                         "detail": "Up to $50K through nonprofit intermediaries. Good for newer businesses or those building credit."})
+
+    # Equipment Financing
+    if fico_score >= 600:
+        products.append({"name": "Equipment Financing", "likelihood": "strong" if fico_score >= 680 else "fair",
+                         "rate": "5-15% depending on equipment type",
+                         "detail": "Secured by the equipment itself. Easier to qualify for since the collateral reduces lender risk."})
+
+    # AR Factoring / Invoice Financing
+    if total_cash_val > 0:
+        products.append({"name": "Invoice Factoring / AR Financing", "likelihood": "fair",
+                         "rate": "1-5% per invoice (factor fee)",
+                         "detail": "Sell outstanding invoices for immediate cash. Credit decision based on your customers' creditworthiness, not yours."})
+
+    # Term Loan
+    if fico_score >= 700 and yrs_in_biz >= 3 and not has_breach:
+        products.append({"name": "Term Loan", "likelihood": "strong", "rate": "Prime + 1-4%",
+                         "detail": "Fixed amount, fixed repayment schedule. Best for specific investments (expansion, acquisition, real estate)."})
+
+    if products:
+        for prod in products:
+            with st.expander(f'{prod["name"]} — {tag_html(prod["likelihood"])} Est. Rate: {prod["rate"]}'):
+                st.markdown(f'{tag_html(prod["likelihood"])}', unsafe_allow_html=True)
+                st.markdown(f'**Estimated Rate:** {prod["rate"]}')
+                st.markdown(prod["detail"])
+    else:
+        st.warning("Limited data available — upload credit reports and bank statements for product matching.")
+
+    # ════════════════════════════════════════════════════════
+    #  DISPLAY: DOCUMENTATION CHECKLIST
+    # ════════════════════════════════════════════════════════
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    st.markdown("### Documentation Checklist")
+    st.caption("What to bring when you meet with a banker")
+
+    banker_docs = [
+        ("3 years of business tax returns", "Required by virtually all lenders"),
+        ("3 years of personal tax returns (all guarantors)", "Required for personal guaranty evaluation"),
+        ("Year-to-date profit & loss statement", "Shows current year performance"),
+        ("Balance sheet (current)", "Shows assets, liabilities, and equity"),
+        ("Accounts receivable aging report", "Shows who owes you and how old the invoices are"),
+        ("Accounts payable aging report", "Shows what you owe and payment patterns"),
+        ("Business debt schedule", "List of all existing loans, lines, and leases with balances and payments"),
+        ("Personal financial statement (all guarantors)", "SBA Form 413 or bank equivalent"),
+        ("Business plan or use-of-funds narrative", "Explain what the financing is for and how it improves the business"),
+        ("Bank statements (last 6 months)", "Shows cash flow patterns and average balances"),
+        ("Business licenses and formation documents", "Articles of incorporation, operating agreement, etc."),
+    ]
+
+    for doc_name, doc_desc in banker_docs:
+        st.markdown(f'{status_html("strong", doc_name, doc_desc)}', unsafe_allow_html=True)

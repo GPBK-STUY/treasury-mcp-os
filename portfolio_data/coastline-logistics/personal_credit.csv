@@ -1,0 +1,2 @@
+borrower_name,ssn_last4,credit_score,score_model,report_date,total_tradelines,open_tradelines,derogatory_marks,collections,public_records,total_revolving_balance,total_revolving_limit,revolving_utilization_pct,total_installment_balance,monthly_installment_payments,oldest_account_years,recent_inquiries_6mo,late_payments_30d,late_payments_60d,late_payments_90d,payment_history_pct,bankruptcies,foreclosures,tax_liens
+Robert Chen,5623,685,FICO 8,2026-01-15,16,10,1,0,0,35200.00,72000.00,48.9,280000.00,2100.00,16.2,2,1,0,0,94.5,0,0,0

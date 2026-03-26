@@ -1,0 +1,4 @@
+vendor_id,vendor_name,payment_terms,discount_terms,outstanding_amount,currency,due_date
+BR-V-001,Sysco Foods,net_30,2/10 net 30,18500.00,USD,2026-03-01
+BR-V-002,US Foods,net_30,2/10 net 30,14200.00,USD,2026-02-28
+BR-V-003,National Linen Service,net_15,,1200.00,USD,2026-02-20

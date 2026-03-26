@@ -1,0 +1,4 @@
+client_id,business_name,industry,rm_name,status,last_review,annual_revenue,city,state
+APEX-001,Apex Manufacturing Corp,Manufacturing,Grant Page,active,2026-01-15,25000000,Boston,MA
+BELLA-001,Bella Rosa Restaurant Group,Food & Beverage,Grant Page,active,2026-02-20,4200000,Providence,RI
+COAST-001,Coastline Logistics LLC,Transportation,Grant Page,watch,2026-03-05,12000000,Hartford,CT

@@ -1,0 +1,4 @@
+covenant_name,covenant_type,required_threshold,current_value,comparison,facility_name,next_test_date
+Debt Service Coverage Ratio,dscr,1.30,1.18,minimum,PNC Term Loan,2026-03-31
+Leverage Ratio,leverage,3.25,3.42,maximum,PNC Term Loan,2026-03-31
+Current Ratio,liquidity,1.40,1.25,minimum,PNC Term Loan,2026-03-31

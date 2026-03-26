@@ -1,0 +1,38 @@
+date,account_id,description,amount,category
+2025-11-01,CL-ACCT-001,Freight Revenue - Regional,42500.00,revenue
+2025-11-02,CL-ACCT-001,Pilot Gas Card,-3800.00,operating_expense
+2025-11-03,CL-ACCT-001,Payroll,-18000.00,payroll
+2025-11-05,CL-ACCT-001,Tire & Maintenance,-5200.00,operating_expense
+2025-11-07,CL-ACCT-001,Freight Revenue - Long Haul,58900.00,revenue
+2025-11-08,CL-ACCT-001,Insurance Payment,-2450.00,operating_expense
+2025-11-10,CL-ACCT-001,Fuel Supply,-12500.00,ap_payment
+2025-11-12,CL-ACCT-001,Freight Revenue - Regional,39800.00,revenue
+2025-11-15,CL-ACCT-001,Payroll,-18000.00,payroll
+2025-11-17,CL-ACCT-001,Tire Distributor,-4100.00,operating_expense
+2025-11-19,CL-ACCT-001,Freight Revenue - Long Haul,52200.00,revenue
+2025-11-22,CL-ACCT-001,Rent/Yard Lease,-8000.00,operating_expense
+2025-11-24,CL-ACCT-001,Freight Revenue - Regional,41300.00,revenue
+2025-11-28,CL-ACCT-001,Payroll,-18000.00,payroll
+2025-12-01,CL-ACCT-001,Freight Revenue - Long Haul,55800.00,revenue
+2025-12-03,CL-ACCT-001,Fuel Supply,-11800.00,ap_payment
+2025-12-06,CL-ACCT-001,Payroll,-18000.00,payroll
+2025-12-09,CL-ACCT-001,Freight Revenue - Regional,38500.00,revenue
+2025-12-11,CL-ACCT-001,Insurance Payment,-2450.00,operating_expense
+2025-12-13,CL-ACCT-001,Rent/Yard Lease,-8000.00,operating_expense
+2025-12-15,CL-ACCT-001,Freight Revenue - Long Haul,61200.00,revenue
+2025-12-17,CL-ACCT-001,Tire Distributor,-3950.00,operating_expense
+2025-12-21,CL-ACCT-001,Payroll,-18000.00,payroll
+2025-12-23,CL-ACCT-001,Freight Revenue - Regional,43100.00,revenue
+2025-12-28,CL-ACCT-001,Term Loan Payment,-7500.00,debt_service
+2026-01-02,CL-ACCT-001,Freight Revenue - Long Haul,49800.00,revenue
+2026-01-04,CL-ACCT-001,Fuel Supply,-12100.00,ap_payment
+2026-01-06,CL-ACCT-001,Payroll,-18000.00,payroll
+2026-01-09,CL-ACCT-001,Freight Revenue - Regional,37200.00,revenue
+2026-01-12,CL-ACCT-001,Tire & Maintenance,-4800.00,operating_expense
+2026-01-15,CL-ACCT-001,Rent/Yard Lease,-8000.00,operating_expense
+2026-01-18,CL-ACCT-001,Freight Revenue - Long Haul,54600.00,revenue
+2026-01-20,CL-ACCT-001,Insurance Payment,-2450.00,operating_expense
+2026-01-27,CL-ACCT-001,Payroll,-18000.00,payroll
+2026-02-01,CL-ACCT-001,Freight Revenue - Regional,40900.00,revenue
+2026-02-03,CL-ACCT-001,Fuel Supply,-11900.00,ap_payment
+2026-02-06,CL-ACCT-001,Payroll,-18000.00,payroll

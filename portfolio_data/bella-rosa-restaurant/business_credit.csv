@@ -1,0 +1,2 @@
+business_name,duns_number,report_date,paydex_score,intelliscore,years_in_business,sic_code,industry,total_trade_experiences,current_pct,days_beyond_terms_avg,high_credit,total_balance_outstanding,payment_trend,derogatory_count,liens,judgments,ucc_filings,bankruptcy_flag,d_and_b_rating,annual_revenue,employees,trade_payment_index
+Bella Rosa Restaurant Group,51-823-9104,2026-01-20,72,38,8,5812,Food Service,14,86.0,2.1,75000.00,33700.00,stable,0,0,0,1,false,3A1,4200000.00,28,72

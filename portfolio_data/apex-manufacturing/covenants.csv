@@ -1,0 +1,6 @@
+covenant_name,covenant_type,required_threshold,current_value,comparison,facility_name,next_test_date
+Debt Service Coverage Ratio,dscr,1.25,1.42,minimum,Citizens Revolver,2026-03-31
+Leverage Ratio,leverage,3.50,2.85,maximum,Citizens Revolver,2026-03-31
+Current Ratio,liquidity,1.50,1.78,minimum,Citizens Revolver,2026-03-31
+Interest Coverage Ratio,interest_coverage,3.00,4.15,minimum,JPM Term Loan,2026-06-30
+Fixed Charge Coverage,fixed_charge,1.10,1.18,minimum,JPM Term Loan,2026-06-30

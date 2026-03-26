@@ -1,0 +1,2 @@
+covenant_name,covenant_type,required_threshold,current_value,comparison,facility_name,next_test_date
+Debt Service Coverage Ratio,dscr,1.15,1.28,minimum,SBA Term Loan,2026-06-30

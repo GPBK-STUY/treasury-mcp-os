@@ -1,0 +1,4 @@
+account_id,bank_name,account_type,currency,balance,yield_rate_bps,last_updated
+BR-ACCT-001,Bank of America,checking,USD,180000.00,0,2026-02-07
+BR-ACCT-002,Bank of America,savings,USD,95000.00,120,2026-02-07
+BR-ACCT-003,Bank of America,money_market,USD,250000.00,425,2026-02-07
