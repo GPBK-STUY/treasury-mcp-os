@@ -8,6 +8,8 @@ import streamlit as st
 import pandas as pd
 import os
 import sys
+import io
+import re
 import tempfile
 from pathlib import Path
 from datetime import datetime
@@ -201,9 +203,165 @@ def run_safe(fn, *a, **kw):
 def save_uploads(files):
     d = tempfile.mkdtemp(prefix="treasuryos_")
     for name, f in files.items():
-        with open(os.path.join(d, name), "wb") as out:
-            out.write(f.getbuffer())
+        if hasattr(f, 'getbuffer'):
+            with open(os.path.join(d, name), "wb") as out:
+                out.write(f.getbuffer())
+        elif isinstance(f, bytes):
+            with open(os.path.join(d, name), "wb") as out:
+                out.write(f)
     return d
+
+
+# ─── File Type Keywords → CSV Mapping ──────────────────────
+_FILE_MAP_KEYWORDS = {
+    "accounts.csv":          ["account", "balance", "bank", "checking", "savings", "deposit"],
+    "transactions.csv":      ["transaction", "debit", "credit", "payment", "transfer", "date", "amount"],
+    "vendors.csv":           ["vendor", "supplier", "payable", "invoice", "due_date", "discount"],
+    "covenants.csv":         ["covenant", "ratio", "threshold", "compliance", "facility", "debt"],
+    "fx_rates.csv":          ["currency", "exchange", "rate", "fx", "eur", "gbp", "jpy", "usd"],
+    "personal_credit.csv":   ["fico", "credit_score", "utilization", "derogatory", "late_payment", "personal"],
+    "business_credit.csv":   ["paydex", "dbt", "lien", "judgment", "years_in_business", "business"],
+}
+
+def _guess_csv_type(df, original_name=""):
+    """Guess which TreasuryOS CSV type a dataframe matches based on column names."""
+    cols_lower = {c.lower().replace(" ", "_") for c in df.columns}
+    name_lower = original_name.lower()
+
+    best_match = None
+    best_score = 0
+
+    for target_csv, keywords in _FILE_MAP_KEYWORDS.items():
+        score = 0
+        # Check column names
+        for kw in keywords:
+            if any(kw in col for col in cols_lower):
+                score += 2
+        # Check original filename
+        target_base = target_csv.replace(".csv", "")
+        if target_base in name_lower:
+            score += 5
+        if score > best_score:
+            best_score = score
+            best_match = target_csv
+
+    return best_match if best_score >= 2 else None
+
+
+def _parse_excel(file_bytes, filename):
+    """Parse Excel file into dict of {csv_name: csv_bytes}."""
+    results = {}
+    try:
+        import openpyxl
+        xls = pd.ExcelFile(io.BytesIO(file_bytes), engine="openpyxl")
+        for sheet in xls.sheet_names:
+            df = pd.read_excel(xls, sheet_name=sheet)
+            if df.empty:
+                continue
+            csv_type = _guess_csv_type(df, f"{filename}_{sheet}")
+            if csv_type and csv_type not in results:
+                buf = io.BytesIO()
+                df.to_csv(buf, index=False)
+                results[csv_type] = buf.getvalue()
+        # If single sheet and no match, try filename
+        if not results and len(xls.sheet_names) == 1:
+            df = pd.read_excel(xls, sheet_name=0)
+            csv_type = _guess_csv_type(df, filename)
+            if csv_type:
+                buf = io.BytesIO()
+                df.to_csv(buf, index=False)
+                results[csv_type] = buf.getvalue()
+    except Exception:
+        pass
+    return results
+
+
+def _parse_pdf(file_bytes, filename):
+    """Extract tables from PDF and map to CSV types."""
+    results = {}
+    try:
+        import pdfplumber
+        pdf = pdfplumber.open(io.BytesIO(file_bytes))
+        for i, pg in enumerate(pdf.pages):
+            tables = pg.extract_tables()
+            for j, table in enumerate(tables):
+                if not table or len(table) < 2:
+                    continue
+                df = pd.DataFrame(table[1:], columns=table[0])
+                csv_type = _guess_csv_type(df, f"{filename}_p{i}_t{j}")
+                if csv_type and csv_type not in results:
+                    buf = io.BytesIO()
+                    df.to_csv(buf, index=False)
+                    results[csv_type] = buf.getvalue()
+        pdf.close()
+    except Exception:
+        pass
+    return results
+
+
+def _parse_docx(file_bytes, filename):
+    """Extract tables from Word doc and map to CSV types."""
+    results = {}
+    try:
+        from docx import Document
+        doc = Document(io.BytesIO(file_bytes))
+        for j, table in enumerate(doc.tables):
+            rows = []
+            for row in table.rows:
+                rows.append([cell.text.strip() for cell in row.cells])
+            if len(rows) < 2:
+                continue
+            df = pd.DataFrame(rows[1:], columns=rows[0])
+            csv_type = _guess_csv_type(df, f"{filename}_t{j}")
+            if csv_type and csv_type not in results:
+                buf = io.BytesIO()
+                df.to_csv(buf, index=False)
+                results[csv_type] = buf.getvalue()
+    except Exception:
+        pass
+    return results
+
+
+def parse_uploaded_files(uploaded_files):
+    """Parse multiple uploaded files (CSV, Excel, Word, PDF) into a dict of {csv_name: bytes}."""
+    all_csvs = {}
+    for uf in uploaded_files:
+        fname = uf.name.lower()
+        raw = uf.read()
+        uf.seek(0)  # Reset for potential re-read
+
+        if fname.endswith(".csv"):
+            try:
+                df = pd.read_csv(io.BytesIO(raw))
+                csv_type = _guess_csv_type(df, uf.name)
+                if csv_type and csv_type not in all_csvs:
+                    all_csvs[csv_type] = raw
+                elif csv_type is None:
+                    # Fallback: use the original filename
+                    safe_name = re.sub(r'[^a-z0-9_.]', '_', fname)
+                    all_csvs[safe_name] = raw
+            except Exception:
+                pass
+
+        elif fname.endswith((".xlsx", ".xls")):
+            parsed = _parse_excel(raw, uf.name)
+            for k, v in parsed.items():
+                if k not in all_csvs:
+                    all_csvs[k] = v
+
+        elif fname.endswith(".pdf"):
+            parsed = _parse_pdf(raw, uf.name)
+            for k, v in parsed.items():
+                if k not in all_csvs:
+                    all_csvs[k] = v
+
+        elif fname.endswith(".docx"):
+            parsed = _parse_docx(raw, uf.name)
+            for k, v in parsed.items():
+                if k not in all_csvs:
+                    all_csvs[k] = v
+
+    return all_csvs
 
 
 # ─── Sidebar ────────────────────────────────────────────────
@@ -216,21 +374,21 @@ with st.sidebar:
 
     if src == "Upload Files":
         st.session_state.using_sample = False
-        uploaded_accounts = st.file_uploader("accounts.csv", type="csv", key="accounts")
-        uploaded_transactions = st.file_uploader("transactions.csv", type="csv", key="transactions")
-        uploaded_vendors = st.file_uploader("vendors.csv", type="csv", key="vendors")
-        uploaded_covenants = st.file_uploader("covenants.csv", type="csv", key="covenants")
-        uploaded_fx = st.file_uploader("fx_rates.csv", type="csv", key="fx")
-        uploaded_pcredit = st.file_uploader("personal_credit.csv", type="csv", key="pcredit")
-        uploaded_bcredit = st.file_uploader("business_credit.csv", type="csv", key="bcredit")
-        fmap = {"accounts.csv": uploaded_accounts, "transactions.csv": uploaded_transactions,
-                "vendors.csv": uploaded_vendors, "covenants.csv": uploaded_covenants,
-                "fx_rates.csv": uploaded_fx, "personal_credit.csv": uploaded_pcredit,
-                "business_credit.csv": uploaded_bcredit}
-        uploaded = {k: v for k, v in fmap.items() if v}
-        if uploaded:
-            st.session_state.data_dir = save_uploads(uploaded)
-            st.session_state.uploaded_files = uploaded
+        st.markdown(f'<p style="color:{TEXT_SECONDARY};font-size:0.8rem;">Upload your financial documents — CSV, Excel, Word, or PDF. We\'ll auto-detect the content type.</p>', unsafe_allow_html=True)
+        uploaded_files = st.file_uploader(
+            "Drop files here",
+            type=["csv", "xlsx", "xls", "docx", "pdf"],
+            accept_multiple_files=True,
+            key="multi_upload"
+        )
+        if uploaded_files:
+            parsed_csvs = parse_uploaded_files(uploaded_files)
+            if parsed_csvs:
+                st.session_state.data_dir = save_uploads(parsed_csvs)
+                st.session_state.uploaded_files = parsed_csvs
+                st.success(f"Loaded {len(parsed_csvs)} data file(s)")
+                for fname in parsed_csvs:
+                    st.caption(f"  {fname}")
     else:
         st.session_state.using_sample = True
         st.session_state.data_dir = str(_DIR / "sample_data")
@@ -238,10 +396,10 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### Navigation")
     page = st.radio("nav", [
+        "Financing Readiness",
         "Overview", "Cash Position", "Idle Cash", "Cash Forecast",
         "Payments", "FX Exposure", "Covenants",
         "Credit Report", "Credit Assessment", "Working Capital",
-        "Financing Readiness"
     ], label_visibility="collapsed")
 
     st.markdown("---")
@@ -684,6 +842,14 @@ elif page == "Working Capital":
 # ═══════════════════════════════════════════════════════════
 elif page == "Financing Readiness":
     st.markdown(f'<div class="top-bar"><div><div class="top-bar-title">Financing Readiness</div><div class="top-bar-sub">How a bank will evaluate your business &middot; {NOW}</div></div></div>', unsafe_allow_html=True)
+
+    # ── Getting Started guide for new users ──
+    if st.session_state.get("using_sample", True):
+        st.info(
+            "**Getting Started:** You're viewing demo data. To see your own readiness score, "
+            "switch to **Upload Files** in the sidebar and drop in your financial documents "
+            "(bank statements, credit reports, etc.). We accept CSV, Excel, Word, and PDF files."
+        )
 
     # ── Collect all data ──
     cash, cash_e = run_safe(get_cash_position, DATA)
