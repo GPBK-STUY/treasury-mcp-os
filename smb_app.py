@@ -319,19 +319,18 @@ with st.sidebar:
         Upload these for the best score (most important first):</p>""", unsafe_allow_html=True)
 
         upload_guide = [
-            ("1. Personal credit report", "25% of score", "Pull free from annualcreditreport.com or Credit Karma"),
-            ("2. Business credit report", "20% of score", "From Nav.com, D&B, or Experian Business"),
-            ("3. Bank statements", "20% of score", "Download from your bank as CSV or PDF"),
-            ("4. Existing loan docs", "10% of score", "Any current loan agreements or covenant schedules"),
+            ("1. Personal credit report", "Pull free from annualcreditreport.com or Credit Karma"),
+            ("2. Business credit report", "From Nav.com, D&B, or Experian Business"),
+            ("3. Bank statements", "Download from your bank as CSV or PDF"),
+            ("4. Existing loan docs", "Any current loan agreements or covenant schedules"),
         ]
-        for doc, weight, source in upload_guide:
+        for doc, source in upload_guide:
             st.markdown(f'<div style="padding:0.3rem 0;border-bottom:1px solid {CARD_BORDER};">'
                         f'<span style="color:{TEXT_PRIMARY};font-size:0.8rem;font-weight:600;">{doc}</span>'
-                        f'<span style="color:{ACCENT};font-size:0.7rem;margin-left:0.5rem;">{weight}</span>'
                         f'<br><span style="color:{TEXT_MUTED};font-size:0.7rem;">{source}</span></div>',
                         unsafe_allow_html=True)
 
-        st.markdown(f'<p style="color:{TEXT_MUTED};font-size:0.7rem;margin-top:0.5rem;">+ Enter working capital on the score page for the remaining 15%</p>', unsafe_allow_html=True)
+        st.markdown(f'<p style="color:{TEXT_MUTED};font-size:0.7rem;margin-top:0.5rem;">+ Enter your working capital numbers on the score page for best results</p>', unsafe_allow_html=True)
         st.caption("We accept CSV, Excel, Word, and PDF files.")
 
         uploaded_files = st.file_uploader(
