@@ -299,12 +299,10 @@ with st.sidebar:
     st.caption("For Business Owners")
     st.markdown("---")
 
-    page = st.radio("nav", [
-        "Get Your Score",
-        "My Cash",
-        "My Credit",
-        "Business Health",
-    ], label_visibility="collapsed")
+    _nav_options = ["Home", "Get Your Score", "My Cash", "My Credit", "Business Health"]
+    _default_idx = _nav_options.index(st.session_state.get("nav_page", "Home")) if st.session_state.get("nav_page", "Home") in _nav_options else 0
+    page = st.radio("nav", _nav_options, index=_default_idx, label_visibility="collapsed")
+    st.session_state.nav_page = page
 
     st.markdown("---")
 
@@ -364,9 +362,107 @@ NOW = datetime.now().strftime("%b %d, %Y")
 
 
 # ═══════════════════════════════════════════════════════════
-#  PAGE 1: GET YOUR SCORE (Financing Readiness)
+#  HOME — LANDING PAGE
 # ═══════════════════════════════════════════════════════════
-if page == "Get Your Score":
+if page == "Home":
+
+    # ── Hero ──
+    st.markdown(f"""
+    <div style="text-align:center;padding:2.5rem 1rem 1.5rem;">
+        <div style="font-size:2.5rem;font-weight:800;color:{TEXT_PRIMARY};line-height:1.2;letter-spacing:-0.03em;">
+            Are you ready for<br>a business loan?
+        </div>
+        <div style="font-size:1.1rem;color:{TEXT_SECONDARY};margin-top:1rem;max-width:550px;margin-left:auto;margin-right:auto;">
+            Find out in 5 minutes. See exactly what a bank will look at,
+            what's helping you, and what to fix before you apply.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+
+    # ── What you'll learn ──
+    st.markdown(f"""
+    <div style="text-align:center;margin-bottom:1.5rem;">
+        <span style="color:{TEXT_MUTED};font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;">What you'll get</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(f"""<div class="card" style="text-align:center;min-height:180px;">
+            <div style="font-size:2rem;margin-bottom:0.5rem;">📊</div>
+            <div style="color:{TEXT_PRIMARY};font-weight:600;font-size:0.95rem;margin-bottom:0.5rem;">Your Readiness Score</div>
+            <div style="color:{TEXT_SECONDARY};font-size:0.85rem;">A clear number from 0-100 showing how likely you are to get approved.</div>
+        </div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div class="card" style="text-align:center;min-height:180px;">
+            <div style="font-size:2rem;margin-bottom:0.5rem;">🎯</div>
+            <div style="color:{TEXT_PRIMARY};font-weight:600;font-size:0.95rem;margin-bottom:0.5rem;">What to Fix First</div>
+            <div style="color:{TEXT_SECONDARY};font-size:0.85rem;">A prioritized list of exactly what to improve before you walk into the bank.</div>
+        </div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""<div class="card" style="text-align:center;min-height:180px;">
+            <div style="font-size:2rem;margin-bottom:0.5rem;">💰</div>
+            <div style="color:{TEXT_PRIMARY};font-weight:600;font-size:0.95rem;margin-bottom:0.5rem;">Loans You Qualify For</div>
+            <div style="color:{TEXT_SECONDARY};font-size:0.85rem;">See which loan products match your profile — SBA, line of credit, equipment financing, and more.</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+
+    # ── How it works ──
+    st.markdown(f"""
+    <div style="text-align:center;margin-bottom:1.5rem;">
+        <span style="color:{TEXT_MUTED};font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;">How it works</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    s1, s2, s3 = st.columns(3)
+    with s1:
+        st.markdown(f"""<div class="card">
+            <div style="color:{ACCENT};font-weight:700;font-size:1.1rem;margin-bottom:0.5rem;">Step 1</div>
+            <div style="color:{TEXT_PRIMARY};font-weight:600;margin-bottom:0.25rem;">Upload your documents</div>
+            <div style="color:{TEXT_SECONDARY};font-size:0.85rem;">Bank statements, credit reports — whatever you have. We accept PDF, Excel, Word, and CSV files.</div>
+        </div>""", unsafe_allow_html=True)
+    with s2:
+        st.markdown(f"""<div class="card">
+            <div style="color:{ACCENT};font-weight:700;font-size:1.1rem;margin-bottom:0.5rem;">Step 2</div>
+            <div style="color:{TEXT_PRIMARY};font-weight:600;margin-bottom:0.25rem;">We analyze everything</div>
+            <div style="color:{TEXT_SECONDARY};font-size:0.85rem;">Our engine checks the same things a bank does — your credit, cash, business history, and existing debt.</div>
+        </div>""", unsafe_allow_html=True)
+    with s3:
+        st.markdown(f"""<div class="card">
+            <div style="color:{ACCENT};font-weight:700;font-size:1.1rem;margin-bottom:0.5rem;">Step 3</div>
+            <div style="color:{TEXT_PRIMARY};font-weight:600;margin-bottom:0.25rem;">Get your game plan</div>
+            <div style="color:{TEXT_SECONDARY};font-size:0.85rem;">See your score, what to fix, which loans you qualify for, and what documents to bring to the bank.</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+
+    # ── CTA ──
+    st.markdown(f"""
+    <div style="text-align:center;padding:1rem 0 2rem;">
+        <div style="color:{TEXT_SECONDARY};font-size:0.95rem;margin-bottom:1rem;">
+            Ready? Click <b style="color:{TEXT_PRIMARY};">Get Your Score</b> in the sidebar to start.<br>
+            Or try the demo first to see how it works.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Quick-start buttons
+    col_l, col_c, col_r = st.columns([1, 2, 1])
+    with col_c:
+        if st.button("See a Demo Score", type="primary", use_container_width=True):
+            st.session_state.using_sample = True
+            st.session_state.data_dir = str(_DIR / "sample_data")
+            st.session_state.nav_page = "Get Your Score"
+            st.rerun()
+
+
+# ═══════════════════════════════════════════════════════════
+#  PAGE 2: GET YOUR SCORE (Financing Readiness)
+# ═══════════════════════════════════════════════════════════
+elif page == "Get Your Score":
     st.markdown(f'<div class="top-bar"><div><div class="top-bar-title">Get Your Financing Score</div><div class="top-bar-sub">See how a bank will evaluate your business &middot; {NOW}</div></div></div>', unsafe_allow_html=True)
 
     # ── Onboarding for demo users ──
