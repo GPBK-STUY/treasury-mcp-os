@@ -1,117 +1,120 @@
 # TreasuryOS
 
+Two tools built on one engine. Pick your door.
+
+---
+
+## For Business Owners
+
 **Find out if you're ready for a business loan — free, in 5 minutes.**
 
-Upload your bank statements and credit reports. Get a readiness score, see what's hurting you, learn what to fix, and find out which loans you qualify for. No account needed. No sales pitch.
+Upload your bank statements and credit reports. Get a 0-100 readiness score, see what's hurting you, learn what to fix, find out which loans you qualify for, and get a checklist of what to bring to the bank.
+
+No account needed. No cost. No sales pitch.
 
 **[Try it now →](https://treasury-mcp-os-dru9zxrd9n82aelwgkvcel.streamlit.app/)**
 
----
+**What you get:**
+- A readiness score based on the same things a bank looks at
+- What's helping and what's hurting — in plain English
+- Which loans fit your profile (SBA, line of credit, equipment financing, etc.)
+- A prioritized list of what to fix before you apply
+- A checklist of what to bring to the banker meeting
 
-## What You Get
-
-- **A readiness score from 0-100** — based on the same things a bank looks at when you apply
-- **What's helping and what's hurting** — broken down into plain English, not banker jargon
-- **Which loans fit your profile** — SBA, line of credit, equipment financing, and more
-- **What to fix first** — prioritized action items before you walk into the bank
-- **A checklist of what to bring** — so your first meeting with a banker actually goes somewhere
-
-## How It Works
-
-1. Go to the app and click **"See a Demo Score"** to see an example
-2. Switch to **"Upload My Files"** in the sidebar
-3. Drop in your bank statements, credit reports, or financial docs (CSV, Excel, Word, or PDF)
-4. See your score and what to do next
-
-## Who This Is For
-
-Business owners thinking about getting a loan, a line of credit, or SBA financing — and wanting to know where they stand before they apply and use a hard credit pull.
+**How to use it:**
+1. Click the link above
+2. Hit **"See a Demo Score"** to see how it works
+3. Switch to **"Upload My Files"** in the sidebar
+4. Drop in your bank statements, credit reports, or financial docs
+5. See your score and game plan
 
 ---
 
-## Under the Hood
+## For Bankers & Relationship Managers
 
-TreasuryOS is built by a former commercial banker who spent 5 years on the other side of the desk evaluating loan applications. The scoring engine uses real underwriting logic — the same criteria banks use to decide whether to approve you.
+**A portfolio dashboard that does the prep work for you.**
 
-### The Scoring Engine
+Search clients, pull up profiles, see financing readiness across your book. The same scoring engine, built for the RM workflow — one search bar to get the full picture on any client.
 
-Six weighted categories, each scored 0-100:
+**[Open RM Dashboard →](https://treasury-os-rm.streamlit.app/)**
 
-| Category | What It Measures |
-|----------|-----------------|
-| Personal Credit | FICO score, credit card usage, payment history, recent inquiries |
-| Business Credit | Paydex score, years in business, vendor payment speed, liens |
-| Cash Position | Total cash, number of accounts, 90-day cash forecast |
-| Working Capital | Current ratio, collection speed, cash cycle, runway |
-| Existing Debt | Covenant compliance, breaches, warning signs |
-| Documentation | Which key documents have been uploaded |
+**What you get:**
+- Portfolio view with search across all clients
+- Client profiles with credit, cash, covenants, and readiness score
+- 9 analysis tools: cash position, forecast, working capital, credit assessment, covenant monitoring, FX exposure, idle cash, payment optimization
+- MCP server integration with Claude Desktop for AI-powered analysis
 
-### Three Apps, One Engine
-
-| App | Audience | File |
-|-----|----------|------|
-| **SMB App** | Business owners | `smb_app.py` |
-| **Full Dashboard** | Power users / all tools | `app.py` |
-| **RM Dashboard** | Bank relationship managers | `rm_dashboard.py` |
-
-All three share the same Python analysis engine in `tools/`.
-
-### Analysis Tools (9 total)
-
-The engine behind the scoring — also available as an MCP server for Claude Desktop:
-
-1. **Cash Position Aggregator** — Balances across all accounts, rolled up by currency and type
-2. **Idle Cash Scanner** — Finds cash sitting in low-yield accounts and calculates the opportunity cost
-3. **Cash Flow Forecaster** — Projects cash position forward 90 days based on transaction patterns
-4. **Working Capital Analyzer** — Current ratio, DSO, DPO, cash conversion cycle, runway
-5. **Payment Optimizer** — Finds early-pay discounts that beat your cost of capital
-6. **FX Exposure Scanner** — Identifies unhedged foreign currency risk
-7. **Covenant Monitor** — Tracks debt covenant compliance and flags breaches
-8. **Credit Report Parser** — Extracts FICO, Paydex, utilization, payment history from credit data
-9. **Credit Position Assessor** — Combines everything into an overall credit rating and lending capacity estimate
-
-### File Structure
-
-```
-treasury-mcp-os/
-├── smb_app.py             ← Business owner app (the product)
-├── app.py                 ← Full dashboard with all 11 pages
-├── rm_dashboard.py        ← RM portfolio dashboard
-├── server.py              ← MCP server for Claude Desktop
-├── models.py              ← Data models
-├── tools/                 ← Analysis engine (9 tools)
-├── sample_data/           ← Demo data (Apex Manufacturing Corp)
-├── portfolio_data/        ← Multi-client data for RM dashboard
-├── requirements.txt
-├── pyproject.toml
-└── setup.sh               ← One-command installer for Claude Desktop
-```
-
-### Quick Start (Local)
-
-**Web dashboard (no Claude needed):**
-```bash
-git clone https://github.com/GPBK-STUY/treasury-mcp-os.git
-cd treasury-mcp-os
-pip install -r requirements.txt
-streamlit run smb_app.py
-```
-
-**MCP server (Claude Desktop integration):**
+**Quick start (Claude Desktop):**
 ```bash
 git clone https://github.com/GPBK-STUY/treasury-mcp-os.git ~/Desktop/treasury-mcp-os
 bash ~/Desktop/treasury-mcp-os/setup.sh
 ```
 
-See [QUICKSTART.md](QUICKSTART.md) for bankers/RMs or [QUICKSTART-OWNERS.md](QUICKSTART-OWNERS.md) for business owners.
+See [QUICKSTART.md](QUICKSTART.md) for full setup.
+
+---
+
+## How It's Built
+
+One analysis engine powers everything. Three apps serve different audiences.
+
+| App | Who it's for | Live link | File |
+|-----|-------------|-----------|------|
+| SMB App | Business owners | [Launch](https://treasury-mcp-os-dru9zxrd9n82aelwgkvcel.streamlit.app/) | `smb_app.py` |
+| RM Dashboard | Bank RMs | [Launch](https://treasury-os-rm.streamlit.app/) | `rm_dashboard.py` |
+| Full Dashboard | Power users | [Launch](https://treasury-mcp-os-dru9zxrd9n82aelwgkvcel.streamlit.app/) | `app.py` |
+
+### The Scoring Engine
+
+Six categories, each scored 0-100:
+
+| Category | What It Measures |
+|----------|-----------------|
+| Personal Credit | FICO, credit card usage, payment history, inquiries |
+| Business Credit | Paydex, years in business, vendor payment speed, liens |
+| Cash Position | Total cash, account count, 90-day forecast |
+| Working Capital | Current ratio, collection speed, cash cycle, runway |
+| Existing Debt | Covenant compliance, breaches, warnings |
+| Documentation | Which key documents have been uploaded |
+
+### Analysis Tools (9)
+
+```
+Cash Position Aggregator    Credit Report Parser
+Idle Cash Scanner           Credit Position Assessor
+Cash Flow Forecaster        Covenant Monitor
+Working Capital Analyzer    FX Exposure Scanner
+Payment Optimizer
+```
 
 ### File Upload
 
-Accepts CSV, Excel (.xlsx), Word (.docx), and PDF files. Auto-detects content type by scanning column headers and maps to the expected data format.
+Accepts CSV, Excel (.xlsx), Word (.docx), and PDF. Auto-detects content type by scanning column headers and maps to the right data format.
 
-### Sample Data
+### Run Locally
 
-The repo includes demo data for a fictional mid-market company (Apex Manufacturing Corp, ~$25M revenue) with bank accounts, transactions, vendor payables, debt covenants, FX rates, and credit reports.
+```bash
+git clone https://github.com/GPBK-STUY/treasury-mcp-os.git
+cd treasury-mcp-os
+pip install -r requirements.txt
+streamlit run smb_app.py        # Business owner app
+streamlit run rm_dashboard.py   # RM dashboard
+streamlit run app.py            # Full dashboard
+```
+
+### File Structure
+
+```
+treasury-mcp-os/
+├── smb_app.py             ← Business owner app
+├── rm_dashboard.py        ← RM portfolio dashboard
+├── app.py                 ← Full dashboard (all 11 pages)
+├── server.py              ← MCP server for Claude Desktop
+├── tools/                 ← Shared analysis engine (9 tools)
+├── sample_data/           ← Demo data (Apex Manufacturing Corp)
+├── portfolio_data/        ← Multi-client data for RM dashboard
+└── setup.sh               ← One-command Claude Desktop installer
+```
 
 ---
 
