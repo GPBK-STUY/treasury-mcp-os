@@ -12,7 +12,7 @@ Upload your bank statements and credit reports. Get a 0-100 readiness score, see
 
 No account needed. No cost. No sales pitch.
 
-**[Try it now →](https://treasury-mcp-os-dru9zxrd9n82aelwgkvcel.streamlit.app/)**
+**[Try it now →](https://treasury-mcp-os-hrxsrpycxbotvmejybhmvy.streamlit.app/)**
 
 **What you get:**
 - A readiness score based on the same things a bank looks at
@@ -60,9 +60,9 @@ One analysis engine powers everything. Three apps serve different audiences.
 
 | App | Who it's for | Live link | File |
 |-----|-------------|-----------|------|
-| SMB App | Business owners | [Launch](https://treasury-mcp-os-dru9zxrd9n82aelwgkvcel.streamlit.app/) | `smb_app.py` |
+| SMB App | Business owners | [Launch](https://treasury-mcp-os-hrxsrpycxbotvmejybhmvy.streamlit.app/) | `smb_app.py` |
 | RM Dashboard | Bank RMs | [Launch](https://treasury-os-rm.streamlit.app/) | `rm_dashboard.py` |
-| Full Dashboard | Power users | [Launch](https://treasury-mcp-os-dru9zxrd9n82aelwgkvcel.streamlit.app/) | `app.py` |
+| Full Dashboard | Power users | [Launch](https://treasury-mcp-os-hrxsrpycxbotvmejybhmvy.streamlit.app/) | `app.py` |
 
 ### The Scoring Engine
 
