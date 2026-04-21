@@ -233,10 +233,244 @@ def _parse_excel(file_bytes, filename):
     except Exception: pass
     return results
 
+def _extract_pdf_text(file_bytes):
+    """Extract all text from a PDF."""
+    text = ""
+    try:
+        import pdfplumber
+        pdf = pdfplumber.open(io.BytesIO(file_bytes))
+        for pg in pdf.pages:
+            pg_text = pg.extract_text()
+            if pg_text:
+                text += pg_text + "\n"
+        pdf.close()
+    except Exception:
+        pass
+    return text
+
+
+def _parse_text_to_credit(text, filename):
+    """Try to extract credit data from raw text using pattern matching."""
+    results = {}
+    text_lower = text.lower()
+
+    # ── Personal Credit Report Detection ──
+    personal_indicators = ["fico", "credit score", "transunion", "equifax", "experian",
+                           "payment history", "revolving", "utilization", "inquiries",
+                           "tradeline", "credit report", "derogatory", "collections",
+                           "credit karma", "annual credit report", "vantagescore"]
+    personal_hits = sum(1 for k in personal_indicators if k in text_lower)
+
+    if personal_hits >= 3:
+        row = {
+            "borrower_name": "", "ssn_last4": "", "credit_score": 0, "score_model": "FICO 8",
+            "report_date": "", "total_tradelines": 0, "open_tradelines": 0,
+            "derogatory_marks": 0, "collections": 0, "public_records": 0,
+            "total_revolving_balance": 0, "total_revolving_limit": 0,
+            "revolving_utilization_pct": 0, "total_installment_balance": 0,
+            "monthly_installment_payments": 0, "oldest_account_years": 0,
+            "recent_inquiries_6mo": 0, "late_payments_30d": 0, "late_payments_60d": 0,
+            "late_payments_90d": 0, "payment_history_pct": 0, "bankruptcies": 0,
+            "foreclosures": 0, "tax_liens": 0,
+        }
+
+        # Extract FICO / credit score
+        import re
+        score_patterns = [
+            r'(?:fico|credit\s*score|vantage\s*score|score)[:\s]*(\d{3})',
+            r'(\d{3})\s*(?:fico|credit\s*score|vantage)',
+            r'score[:\s]*(\d{3})',
+        ]
+        for pat in score_patterns:
+            m = re.search(pat, text_lower)
+            if m:
+                val = int(m.group(1))
+                if 300 <= val <= 850:
+                    row["credit_score"] = val
+                    break
+
+        # Extract utilization
+        util_patterns = [
+            r'(?:utilization|usage)[:\s]*([\d.]+)\s*%',
+            r'([\d.]+)\s*%\s*(?:utilization|usage)',
+        ]
+        for pat in util_patterns:
+            m = re.search(pat, text_lower)
+            if m:
+                row["revolving_utilization_pct"] = float(m.group(1))
+                break
+
+        # Extract payment history percentage
+        hist_patterns = [r'(?:payment\s*history|on.time)[:\s]*([\d.]+)\s*%']
+        for pat in hist_patterns:
+            m = re.search(pat, text_lower)
+            if m:
+                row["payment_history_pct"] = float(m.group(1))
+                break
+
+        # Extract tradeline counts
+        trade_patterns = [r'(\d+)\s*(?:total\s*)?(?:accounts?|tradelines?)']
+        for pat in trade_patterns:
+            m = re.search(pat, text_lower)
+            if m:
+                row["total_tradelines"] = int(m.group(1))
+                break
+
+        open_patterns = [r'(\d+)\s*open\s*(?:accounts?|tradelines?)']
+        for pat in open_patterns:
+            m = re.search(pat, text_lower)
+            if m:
+                row["open_tradelines"] = int(m.group(1))
+                break
+
+        # Extract late payments
+        late30 = re.search(r'(\d+)\s*(?:late|past\s*due).*?30', text_lower)
+        late60 = re.search(r'(\d+)\s*(?:late|past\s*due).*?60', text_lower)
+        late90 = re.search(r'(\d+)\s*(?:late|past\s*due).*?90', text_lower)
+        if late30: row["late_payments_30d"] = int(late30.group(1))
+        if late60: row["late_payments_60d"] = int(late60.group(1))
+        if late90: row["late_payments_90d"] = int(late90.group(1))
+
+        # Derogatory marks
+        derog = re.search(r'(\d+)\s*derogator', text_lower)
+        if derog: row["derogatory_marks"] = int(derog.group(1))
+
+        # Collections
+        coll = re.search(r'(\d+)\s*collection', text_lower)
+        if coll: row["collections"] = int(coll.group(1))
+
+        # Inquiries
+        inq = re.search(r'(\d+)\s*(?:inquir|hard\s*pull)', text_lower)
+        if inq: row["recent_inquiries_6mo"] = int(inq.group(1))
+
+        # Bankruptcies
+        bk = re.search(r'(\d+)\s*bankruptc', text_lower)
+        if bk: row["bankruptcies"] = int(bk.group(1))
+
+        # Balance extraction
+        bal_patterns = [
+            (r'revolving\s*balance[:\s]*\$?([\d,]+)', "total_revolving_balance"),
+            (r'revolving\s*(?:credit\s*)?limit[:\s]*\$?([\d,]+)', "total_revolving_limit"),
+            (r'installment\s*balance[:\s]*\$?([\d,]+)', "total_installment_balance"),
+        ]
+        for pat, field in bal_patterns:
+            m = re.search(pat, text_lower)
+            if m:
+                row[field] = float(m.group(1).replace(",", ""))
+
+        if row["credit_score"] > 0:
+            df = pd.DataFrame([row])
+            buf = io.BytesIO(); df.to_csv(buf, index=False)
+            results["personal_credit.csv"] = buf.getvalue()
+
+    # ── Business Credit Report Detection ──
+    business_indicators = ["paydex", "duns", "d&b", "dun & bradstreet", "experian business",
+                           "intelliscore", "business credit", "trade experiences",
+                           "days beyond terms", "payment trend", "ucc filing",
+                           "sic code", "naics", "nav.com"]
+    business_hits = sum(1 for k in business_indicators if k in text_lower)
+
+    if business_hits >= 2:
+        row = {
+            "business_name": "", "duns_number": "", "report_date": "",
+            "paydex_score": 0, "intelliscore": 0, "years_in_business": 0,
+            "sic_code": "", "industry": "", "total_trade_experiences": 0,
+            "current_pct": 0, "days_beyond_terms_avg": 0, "high_credit": 0,
+            "total_balance_outstanding": 0, "payment_trend": "stable",
+            "derogatory_count": 0, "liens": 0, "judgments": 0, "ucc_filings": 0,
+            "bankruptcy_flag": "false", "d_and_b_rating": "", "annual_revenue": 0,
+            "employees": 0, "trade_payment_index": 0,
+        }
+
+        import re
+        paydex = re.search(r'paydex[:\s]*(\d{1,3})', text_lower)
+        if paydex:
+            val = int(paydex.group(1))
+            if 0 <= val <= 100: row["paydex_score"] = val
+
+        yrs = re.search(r'(\d+)\s*(?:years?\s*in\s*business|years?\s*established|yrs)', text_lower)
+        if yrs: row["years_in_business"] = int(yrs.group(1))
+
+        dbt = re.search(r'(?:days?\s*beyond\s*terms?|dbt)[:\s]*([\d.]+)', text_lower)
+        if dbt: row["days_beyond_terms_avg"] = float(dbt.group(1))
+
+        trade_exp = re.search(r'(\d+)\s*trade\s*experience', text_lower)
+        if trade_exp: row["total_trade_experiences"] = int(trade_exp.group(1))
+
+        liens_m = re.search(r'(\d+)\s*lien', text_lower)
+        if liens_m: row["liens"] = int(liens_m.group(1))
+
+        judgments_m = re.search(r'(\d+)\s*judgment', text_lower)
+        if judgments_m: row["judgments"] = int(judgments_m.group(1))
+
+        ucc_m = re.search(r'(\d+)\s*ucc', text_lower)
+        if ucc_m: row["ucc_filings"] = int(ucc_m.group(1))
+
+        if row["paydex_score"] > 0 or row["years_in_business"] > 0:
+            df = pd.DataFrame([row])
+            buf = io.BytesIO(); df.to_csv(buf, index=False)
+            results["business_credit.csv"] = buf.getvalue()
+
+    # ── Bank Statement Detection ──
+    bank_indicators = ["checking", "savings", "account number", "routing",
+                       "beginning balance", "ending balance", "deposits",
+                       "withdrawals", "statement period", "bank statement",
+                       "available balance", "current balance", "account summary"]
+    bank_hits = sum(1 for k in bank_indicators if k in text_lower)
+
+    if bank_hits >= 2:
+        import re
+        accounts = []
+        # Try to find balances
+        balance_patterns = [
+            r'(?:ending|current|available|closing)\s*balance[:\s]*\$?([\d,]+\.?\d*)',
+            r'\$\s*([\d,]+\.?\d{2})\s*(?:ending|current|available|closing)',
+        ]
+        for pat in balance_patterns:
+            for m in re.finditer(pat, text_lower):
+                bal = float(m.group(1).replace(",", ""))
+                if bal > 0:
+                    accounts.append({
+                        "account_id": f"ACCT-PDF-{len(accounts)+1}",
+                        "bank_name": "From Statement",
+                        "account_type": "checking",
+                        "currency": "USD",
+                        "balance": bal,
+                        "yield_rate_bps": 0,
+                        "last_updated": "",
+                    })
+
+        # If no specific balances found, try to find any large dollar amounts
+        if not accounts:
+            dollar_amounts = re.findall(r'\$\s*([\d,]+\.?\d{2})', text)
+            amounts = [float(a.replace(",", "")) for a in dollar_amounts if float(a.replace(",", "")) > 1000]
+            if amounts:
+                # Use the largest as the balance (likely ending balance)
+                bal = max(amounts)
+                accounts.append({
+                    "account_id": "ACCT-PDF-1",
+                    "bank_name": "From Statement",
+                    "account_type": "checking",
+                    "currency": "USD",
+                    "balance": bal,
+                    "yield_rate_bps": 0,
+                    "last_updated": "",
+                })
+
+        if accounts:
+            df = pd.DataFrame(accounts)
+            buf = io.BytesIO(); df.to_csv(buf, index=False)
+            results["accounts.csv"] = buf.getvalue()
+
+    return results
+
+
 def _parse_pdf(file_bytes, filename):
     results = {}
     try:
         import pdfplumber
+
+        # First try: extract structured tables
         pdf = pdfplumber.open(io.BytesIO(file_bytes))
         for i, pg in enumerate(pdf.pages):
             for j, table in enumerate(pg.extract_tables()):
@@ -247,6 +481,16 @@ def _parse_pdf(file_bytes, filename):
                     buf = io.BytesIO(); df.to_csv(buf, index=False)
                     results[csv_type] = buf.getvalue()
         pdf.close()
+
+        # Second try: if no tables found, extract text and parse with patterns
+        if not results:
+            text = _extract_pdf_text(file_bytes)
+            if text.strip():
+                text_results = _parse_text_to_credit(text, filename)
+                for k, v in text_results.items():
+                    if k not in results:
+                        results[k] = v
+
     except Exception: pass
     return results
 
@@ -255,6 +499,8 @@ def _parse_docx(file_bytes, filename):
     try:
         from docx import Document
         doc = Document(io.BytesIO(file_bytes))
+
+        # First try: extract tables
         for j, table in enumerate(doc.tables):
             rows = [[cell.text.strip() for cell in row.cells] for row in table.rows]
             if len(rows) < 2: continue
@@ -263,6 +509,15 @@ def _parse_docx(file_bytes, filename):
             if csv_type and csv_type not in results:
                 buf = io.BytesIO(); df.to_csv(buf, index=False)
                 results[csv_type] = buf.getvalue()
+
+        # Second try: if no tables found, extract text and parse with patterns
+        if not results:
+            text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+            if text.strip():
+                text_results = _parse_text_to_credit(text, filename)
+                for k, v in text_results.items():
+                    if k not in results:
+                        results[k] = v
     except Exception: pass
     return results
 
@@ -347,7 +602,12 @@ with st.sidebar:
                 for fname in parsed:
                     st.caption(f"  {fname}")
             else:
-                st.warning("Couldn't detect data in those files. Try CSV exports from your bank or accounting software.")
+                st.warning(
+                    "We couldn't pull numbers from those files automatically. "
+                    "This can happen with scanned documents or image-based PDFs. "
+                    "Try downloading a CSV or Excel export from your bank's website, "
+                    "or from Credit Karma / Nav.com if it's a credit report."
+                )
     else:
         st.session_state.using_sample = True
         st.session_state.data_dir = str(_DIR / "sample_data")
