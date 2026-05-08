@@ -250,18 +250,29 @@ def _extract_pdf_text(file_bytes):
 
 
 def _parse_text_to_credit(text, filename):
-    """Try to extract credit data from raw text using pattern matching."""
+    """Try to extract credit data from raw text using pattern matching.
+    Handles Experian, TransUnion, Equifax, Credit Karma, and generic credit reports."""
+    import re
     results = {}
     text_lower = text.lower()
 
     # ── Personal Credit Report Detection ──
-    personal_indicators = ["fico", "credit score", "transunion", "equifax", "experian",
-                           "payment history", "revolving", "utilization", "inquiries",
-                           "tradeline", "credit report", "derogatory", "collections",
-                           "credit karma", "annual credit report", "vantagescore"]
+    # Broad detection — catch any credit bureau report format
+    personal_indicators = [
+        "fico", "credit score", "vantagescore", "transunion", "equifax", "experian",
+        "payment history", "revolving", "utilization", "inquiries", "inquires",
+        "tradeline", "credit report", "derogatory", "collections", "collection",
+        "credit karma", "annual credit report", "credit limit", "account history",
+        "potentially negative", "credit usage", "credit limit used",
+        "account summary", "account details", "account information",
+        "hard inquir", "soft inquir", "public record", "open accounts",
+        "closed accounts", "past due", "amount owed", "credit card",
+        "payment status", "negative items", "regular accounts",
+        "total balance", "total accounts", "on-time", "on time",
+    ]
     personal_hits = sum(1 for k in personal_indicators if k in text_lower)
 
-    if personal_hits >= 3:
+    if personal_hits >= 2:
         row = {
             "borrower_name": "", "ssn_last4": "", "credit_score": 0, "score_model": "FICO 8",
             "report_date": "", "total_tradelines": 0, "open_tradelines": 0,
@@ -274,91 +285,173 @@ def _parse_text_to_credit(text, filename):
             "foreclosures": 0, "tax_liens": 0,
         }
 
-        # Extract FICO / credit score
-        import re
+        # ── Credit Score (many formats) ──
         score_patterns = [
-            r'(?:fico|credit\s*score|vantage\s*score|score)[:\s]*(\d{3})',
-            r'(\d{3})\s*(?:fico|credit\s*score|vantage)',
-            r'score[:\s]*(\d{3})',
+            # "FICO Score 8: 742" or "FICO® Score 742"
+            r'fico[®\s]*(?:score)?[\s:]*(?:8|2|9|10)?[\s:]*(\d{3})',
+            # "VantageScore 3.0: 718" or "VantageScore® 3.0 718"
+            r'vantage\s*score[®\s]*[\d.]*[\s:]*(\d{3})',
+            # "Credit Score: 742" or "Credit Score 742"
+            r'credit\s*score[\s:\-]*(\d{3})',
+            # "Your score: 742" or "Your Score 742"
+            r'your\s*score[\s:\-]*(\d{3})',
+            # "Score: 742"
+            r'score[\s:\-]+(\d{3})',
+            # "TransUnion Credit Score: 718"
+            r'(?:transunion|equifax|experian)\s*(?:credit\s*)?score[\s:\-]*(\d{3})',
+            # Standalone 3-digit number near score context (last resort)
+            r'(?:score|fico|vantage)[\s\S]{0,20}?(\d{3})',
+            # "742" right after "FICO" within 30 chars
+            r'fico[\s\S]{0,30}?(\d{3})',
         ]
         for pat in score_patterns:
-            m = re.search(pat, text_lower)
-            if m:
+            for m in re.finditer(pat, text_lower):
                 val = int(m.group(1))
                 if 300 <= val <= 850:
                     row["credit_score"] = val
                     break
+            if row["credit_score"] > 0:
+                break
 
-        # Extract utilization
+        # ── Utilization / Credit Usage ──
         util_patterns = [
-            r'(?:utilization|usage)[:\s]*([\d.]+)\s*%',
-            r'([\d.]+)\s*%\s*(?:utilization|usage)',
+            r'(?:credit\s*usage|utilization|credit\s*limit\s*used)[\s:\-]*([\d.]+)\s*%',
+            r'([\d.]+)\s*%\s*(?:utilization|credit\s*usage|of\s*credit\s*(?:limit\s*)?used)',
+            r'(?:revolving\s*)?utilization[\s:\-]*([\d.]+)',
+            r'usage[\s:\-]*([\d.]+)\s*%',
         ]
         for pat in util_patterns:
             m = re.search(pat, text_lower)
             if m:
-                row["revolving_utilization_pct"] = float(m.group(1))
-                break
+                val = float(m.group(1))
+                if 0 <= val <= 100:
+                    row["revolving_utilization_pct"] = val
+                    break
 
-        # Extract payment history percentage
-        hist_patterns = [r'(?:payment\s*history|on.time)[:\s]*([\d.]+)\s*%']
+        # ── Payment History ──
+        hist_patterns = [
+            r'(?:payment\s*history|on[\-\s]time\s*payments?)[\s:\-]*([\d.]+)\s*%',
+            r'([\d.]+)\s*%\s*(?:on[\-\s]time|payment\s*history)',
+        ]
         for pat in hist_patterns:
             m = re.search(pat, text_lower)
             if m:
-                row["payment_history_pct"] = float(m.group(1))
-                break
+                val = float(m.group(1))
+                if 0 <= val <= 100:
+                    row["payment_history_pct"] = val
+                    break
 
-        # Extract tradeline counts
-        trade_patterns = [r'(\d+)\s*(?:total\s*)?(?:accounts?|tradelines?)']
-        for pat in trade_patterns:
+        # ── Account Counts ──
+        acct_patterns = [
+            # "Total Accounts: 18" or "Total Accounts 18"
+            (r'total\s*accounts[\s:\-]*(\d+)', "total_tradelines"),
+            (r'(\d+)\s*total\s*accounts', "total_tradelines"),
+            # "Open Accounts: 12"
+            (r'open\s*accounts[\s:\-]*(\d+)', "open_tradelines"),
+            (r'(\d+)\s*open\s*accounts', "open_tradelines"),
+            # "Closed Accounts: 6"
+            # Tradelines format
+            (r'total\s*tradelines[\s:\-]*(\d+)', "total_tradelines"),
+            (r'(\d+)\s*(?:total\s*)?tradelines', "total_tradelines"),
+            (r'open\s*tradelines[\s:\-]*(\d+)', "open_tradelines"),
+        ]
+        for pat, field in acct_patterns:
+            if row[field] == 0:
+                m = re.search(pat, text_lower)
+                if m:
+                    row[field] = int(m.group(1))
+
+        # ── Late Payments ──
+        late_patterns_30 = [
+            r'30\s*(?:days?\s*)?(?:late|past\s*due)[\s:\-]*(\d+)',
+            r'(\d+)\s*(?:times?\s*)?30\s*(?:days?\s*)?(?:late|past\s*due)',
+            r'(?:late|past\s*due)\s*30[\s:\-]*(\d+)',
+        ]
+        late_patterns_60 = [
+            r'60\s*(?:days?\s*)?(?:late|past\s*due)[\s:\-]*(\d+)',
+            r'(\d+)\s*(?:times?\s*)?60\s*(?:days?\s*)?(?:late|past\s*due)',
+        ]
+        late_patterns_90 = [
+            r'90\s*(?:days?\s*)?(?:late|past\s*due)[\s:\-]*(\d+)',
+            r'(\d+)\s*(?:times?\s*)?90\s*(?:days?\s*)?(?:late|past\s*due)',
+        ]
+        for pat in late_patterns_30:
             m = re.search(pat, text_lower)
-            if m:
-                row["total_tradelines"] = int(m.group(1))
-                break
-
-        open_patterns = [r'(\d+)\s*open\s*(?:accounts?|tradelines?)']
-        for pat in open_patterns:
+            if m: row["late_payments_30d"] = int(m.group(1)); break
+        for pat in late_patterns_60:
             m = re.search(pat, text_lower)
-            if m:
-                row["open_tradelines"] = int(m.group(1))
-                break
+            if m: row["late_payments_60d"] = int(m.group(1)); break
+        for pat in late_patterns_90:
+            m = re.search(pat, text_lower)
+            if m: row["late_payments_90d"] = int(m.group(1)); break
 
-        # Extract late payments
-        late30 = re.search(r'(\d+)\s*(?:late|past\s*due).*?30', text_lower)
-        late60 = re.search(r'(\d+)\s*(?:late|past\s*due).*?60', text_lower)
-        late90 = re.search(r'(\d+)\s*(?:late|past\s*due).*?90', text_lower)
-        if late30: row["late_payments_30d"] = int(late30.group(1))
-        if late60: row["late_payments_60d"] = int(late60.group(1))
-        if late90: row["late_payments_90d"] = int(late90.group(1))
+        # ── Derogatory / Negative Items ──
+        derog_patterns = [
+            r'(\d+)\s*(?:derogatory|negative)\s*(?:items?|marks?|accounts?)',
+            r'(?:derogatory|negative)\s*(?:items?|marks?|accounts?)[\s:\-]*(\d+)',
+            r'potentially\s*negative\s*items[\s:\-]*(\d+)',
+        ]
+        for pat in derog_patterns:
+            m = re.search(pat, text_lower)
+            if m: row["derogatory_marks"] = int(m.group(1)); break
 
-        # Derogatory marks
-        derog = re.search(r'(\d+)\s*derogator', text_lower)
-        if derog: row["derogatory_marks"] = int(derog.group(1))
+        # ── Collections ──
+        coll_patterns = [
+            r'(\d+)\s*(?:collection|collections)\s*(?:account|item)',
+            r'(?:collection|collections)[\s:\-]*(\d+)',
+            r'(\d+)\s*(?:accounts?\s*)?in\s*collection',
+        ]
+        for pat in coll_patterns:
+            m = re.search(pat, text_lower)
+            if m: row["collections"] = int(m.group(1)); break
 
-        # Collections
-        coll = re.search(r'(\d+)\s*collection', text_lower)
-        if coll: row["collections"] = int(coll.group(1))
+        # ── Inquiries ──
+        inq_patterns = [
+            r'hard\s*inquir(?:y|ies)[\s:\-]*(\d+)',
+            r'(\d+)\s*hard\s*inquir',
+            r'(?:credit\s*)?inquir(?:y|ies)[\s:\-]*(\d+)',
+            r'(\d+)\s*(?:recent\s*)?inquir',
+        ]
+        for pat in inq_patterns:
+            m = re.search(pat, text_lower)
+            if m: row["recent_inquiries_6mo"] = int(m.group(1)); break
 
-        # Inquiries
-        inq = re.search(r'(\d+)\s*(?:inquir|hard\s*pull)', text_lower)
-        if inq: row["recent_inquiries_6mo"] = int(inq.group(1))
+        # ── Public Records / Bankruptcies ──
+        bk_patterns = [
+            r'(\d+)\s*bankruptc',
+            r'bankruptc(?:y|ies)[\s:\-]*(\d+)',
+        ]
+        for pat in bk_patterns:
+            m = re.search(pat, text_lower)
+            if m: row["bankruptcies"] = int(m.group(1)); break
 
-        # Bankruptcies
-        bk = re.search(r'(\d+)\s*bankruptc', text_lower)
-        if bk: row["bankruptcies"] = int(bk.group(1))
+        lien_patterns = [r'(\d+)\s*(?:tax\s*)?lien', r'(?:tax\s*)?lien[\s:\-]*(\d+)']
+        for pat in lien_patterns:
+            m = re.search(pat, text_lower)
+            if m: row["tax_liens"] = int(m.group(1)); break
 
-        # Balance extraction
+        # ── Balances ──
         bal_patterns = [
-            (r'revolving\s*balance[:\s]*\$?([\d,]+)', "total_revolving_balance"),
-            (r'revolving\s*(?:credit\s*)?limit[:\s]*\$?([\d,]+)', "total_revolving_limit"),
-            (r'installment\s*balance[:\s]*\$?([\d,]+)', "total_installment_balance"),
+            (r'(?:revolving|credit\s*card)\s*balance[\s:\-]*\$?([\d,]+)', "total_revolving_balance"),
+            (r'(?:revolving|credit\s*card)\s*(?:credit\s*)?limit[\s:\-]*\$?([\d,]+)', "total_revolving_limit"),
+            (r'(?:total\s*)?(?:revolving|credit\s*card)\s*balance[\s:\-]*\$?([\d,]+)', "total_revolving_balance"),
+            (r'installment\s*balance[\s:\-]*\$?([\d,]+)', "total_installment_balance"),
+            (r'total\s*balance[\s:\-]*\$?([\d,]+)', "total_revolving_balance"),
+            (r'total\s*(?:credit\s*)?limit[\s:\-]*\$?([\d,]+)', "total_revolving_limit"),
+            (r'amount\s*owed[\s:\-]*\$?([\d,]+)', "total_revolving_balance"),
         ]
         for pat, field in bal_patterns:
-            m = re.search(pat, text_lower)
-            if m:
-                row[field] = float(m.group(1).replace(",", ""))
+            if row[field] == 0:
+                m = re.search(pat, text_lower)
+                if m:
+                    row[field] = float(m.group(1).replace(",", ""))
 
-        if row["credit_score"] > 0:
+        # Accept if we found a score OR enough other data points
+        data_points = sum(1 for v in row.values() if v and v != 0 and v != "" and v != "FICO 8")
+        if row["credit_score"] > 0 or data_points >= 4:
+            # If no score but we have data, set a flag score so it still processes
+            if row["credit_score"] == 0:
+                row["credit_score"] = 1  # Will show as "no score found" in the engine
             df = pd.DataFrame([row])
             buf = io.BytesIO(); df.to_csv(buf, index=False)
             results["personal_credit.csv"] = buf.getvalue()
@@ -601,12 +694,24 @@ with st.sidebar:
                 st.success(f"{len(parsed)} file(s) loaded")
                 for fname in parsed:
                     st.caption(f"  {fname}")
+                # Show which uploaded files didn't parse
+                parsed_count = len(parsed)
+                uploaded_count = len(uploaded_files)
+                if parsed_count < uploaded_count:
+                    skipped = uploaded_count - parsed_count
+                    st.warning(
+                        f"{skipped} file(s) couldn't be read. "
+                        "If a credit report didn't load, try downloading it "
+                        "as a PDF directly from Experian.com, Credit Karma, "
+                        "or annualcreditreport.com. Scanned paper documents "
+                        "won't work — it needs to be a digital download."
+                    )
             else:
                 st.warning(
-                    "We couldn't pull numbers from those files automatically. "
-                    "This can happen with scanned documents or image-based PDFs. "
-                    "Try downloading a CSV or Excel export from your bank's website, "
-                    "or from Credit Karma / Nav.com if it's a credit report."
+                    "We couldn't pull numbers from those files. "
+                    "This usually happens with scanned paper documents or image-based PDFs. "
+                    "Try downloading a digital PDF or CSV export directly from your "
+                    "bank's website, or from Credit Karma / Experian.com for credit reports."
                 )
     else:
         st.session_state.using_sample = True
