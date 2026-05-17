@@ -1,4 +1,4 @@
-# TreasuryOS
+# Credit Analysis
 
 Two tools built on one engine. Pick your door.
 
@@ -60,7 +60,7 @@ One analysis engine powers everything. Three apps serve different audiences.
 
 | App | Who it's for | Live link | File |
 |-----|-------------|-----------|------|
-| SMB App | Business owners | [Launch](https://treasury-mcp-os-hrxsrpycxbotvmejybhmvy.streamlit.app/) | `smb_app.py` |
+| Credit Analysis | Business owners | [Launch](https://treasury-mcp-os-hrxsrpycxbotvmejybhmvy.streamlit.app/) | `smb_app.py` |
 | RM Dashboard | Bank RMs | [Launch](https://treasury-os-rm.streamlit.app/) | `rm_dashboard.py` |
 | Full Dashboard | Power users | [Launch](https://treasury-mcp-os-hrxsrpycxbotvmejybhmvy.streamlit.app/) | `app.py` |
 
@@ -106,7 +106,7 @@ streamlit run app.py            # Full dashboard
 
 ```
 treasury-mcp-os/
-├── smb_app.py             ← Business owner app
+├── smb_app.py             ← Credit Analysis (business owner app)
 ├── rm_dashboard.py        ← RM portfolio dashboard
 ├── app.py                 ← Full dashboard (all 11 pages)
 ├── server.py              ← MCP server for Claude Desktop

@@ -1,5 +1,5 @@
 """
-TreasuryOS for Business Owners
+Credit Analysis for Business Owners
 Get financing-ready. Know your numbers. Walk into the bank with confidence.
 Run:  streamlit run smb_app.py
 """
@@ -26,7 +26,7 @@ from tools.credit_parser import parse_credit_report
 from tools.credit_assessor import assess_credit_position
 
 # ─── Config ─────────────────────────────────────────────────
-st.set_page_config(page_title="TreasuryOS", page_icon="T", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Credit Analysis", page_icon="C", layout="wide", initial_sidebar_state="expanded")
 
 # ─── Design System ──────────────────────────────────────────
 NAVY = "#0B1426"
@@ -643,7 +643,7 @@ def parse_uploaded_files(uploaded_files):
 
 # ─── Sidebar ────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("# T  TreasuryOS")
+    st.markdown("# C  Credit Analysis")
     st.caption("For Business Owners")
     st.markdown("---")
 
@@ -718,7 +718,7 @@ with st.sidebar:
         st.session_state.data_dir = str(_DIR / "sample_data")
 
     st.markdown("---")
-    st.markdown(f'<p style="color:{TEXT_MUTED}; font-size:0.7rem; text-align:center;">TreasuryOS v1.0</p>', unsafe_allow_html=True)
+    st.markdown(f'<p style="color:{TEXT_MUTED}; font-size:0.7rem; text-align:center;">Credit Analysis v1.0</p>', unsafe_allow_html=True)
 
 
 # ─── Main ───────────────────────────────────────────────────
