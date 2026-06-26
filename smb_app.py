@@ -558,34 +558,360 @@ def _parse_text_to_credit(text, filename):
     return results
 
 
-def _parse_pdf(file_bytes, filename):
+# ─── PDF Format Detection ────────────────────────────────────
+
+def _is_text_bank_statement(text):
+    """Detect bank statements that use a text-based transaction format (Credits:/Debits: sections)."""
+    has_balance = bool(re.search(r'balance\s+\d{2}/\d{2}/\d{2}', text, re.IGNORECASE))
+    has_sections = bool(re.search(r'^(credits?:|credit transactions|debits?:|debit transactions|other debits)',
+                                   text, re.IGNORECASE | re.MULTILINE))
+    return has_balance and has_sections
+
+
+def _is_experian_business_credit(text):
+    """Detect Experian Business Credit Advantage report."""
+    text_lower = text.lower()
+    hits = sum(1 for k in [
+        "business credit score", "financial stability risk", "intelliscore",
+        "days beyond payment terms", "trade experiences", "sbfe",
+        "business credit advantage", "experian business",
+    ] if k in text_lower)
+    return hits >= 2
+
+
+def _is_garbled_pdf(text, page_count=1):
+    """Detect CID-encoded PDFs (fonts not embedded — unreadable with pdfplumber)."""
+    if not text or len(text.strip()) < 150:
+        return True
+    return text.count("(cid:") > 20
+
+
+# ─── Bank Statement Text Parser ──────────────────────────────
+
+def _categorize_bank_txn(desc, is_credit):
+    d = desc.lower()
+    if is_credit:
+        return "ar_collection"
+    if any(k in d for k in ["payroll", "adp", "paychex", "gusto"]):
+        return "payroll"
+    if any(k in d for k in ["insurance", "aflac", "bcbs"]):
+        return "insurance"
+    if any(k in d for k in ["rent", "lease", "mortgage"]):
+        return "rent"
+    if any(k in d for k in ["amex", "american express", "capital one", "chase card",
+                              "citi card", "discover", "card online", "card payment",
+                              "online pmt", "online payment"]):
+        return "credit_card_payment"
+    if any(k in d for k in ["irs", "tax dept", "dept rev"]):
+        return "tax"
+    if any(k in d for k in ["loan", "sba", "interest pmt"]):
+        return "loan_payment"
+    if "check" in d:
+        return "check"
+    return "ap_payment"
+
+
+def _parse_txn_line(line):
+    """Extract (MM/DD, description, amount_str) from a bank statement transaction line."""
+    m = re.match(r'^(\d{2}/\d{2})\s+(.+)', line.strip())
+    if not m:
+        return None
+    rest = m.group(2).strip()
+    tokens = rest.split()
+    if not tokens:
+        return None
+    last = tokens[-1]
+    if not re.match(r'^[\d,]+\.\d{2}$', last):
+        return None
+    return m.group(1), ' '.join(tokens[:-1]), last
+
+
+def _parse_text_bank_statement(text):
+    """Parse bank statements where transactions are in plain text (Credits:/Debits: sections)."""
     results = {}
+
+    # Account number from XXXXXXXX#### pattern
+    acct_match = re.search(r'X{4,}(\d{4})', text)
+    acct_suffix = acct_match.group(1) if acct_match else "UNKNOWN"
+    account_id = f"ACCT-{acct_suffix}"
+
+    # Bank name from known identifiers
+    text_lower = text.lower()
+    if "pinnacle" in text_lower or "pnfp" in text_lower:
+        bank_name = "Pinnacle Financial"
+    elif "bank of america" in text_lower or "bofa" in text_lower:
+        bank_name = "Bank of America"
+    elif "wells fargo" in text_lower:
+        bank_name = "Wells Fargo"
+    elif "chase" in text_lower:
+        bank_name = "JPMorgan Chase"
+    elif "truist" in text_lower:
+        bank_name = "Truist"
+    elif "regions" in text_lower:
+        bank_name = "Regions Bank"
+    else:
+        bank_name = "Bank"
+
+    account_type = "savings" if "savings" in text_lower else "checking"
+
+    # Extract ending balance and statement year
+    # Look for "Balance MM/DD/YY" then find the dollar amount on same or next line
+    lines = text.split('\n')
+    balance_values = []
+    statement_year = str(datetime.now().year)
+
+    for i, line in enumerate(lines):
+        bm = re.match(r'Balance\s+(\d{2})/(\d{2})/(\d{2})', line.strip(), re.IGNORECASE)
+        if bm:
+            statement_year = "20" + bm.group(3)
+            # Check same line for dollar amount
+            m = re.search(r'\$?([\d,]+\.\d{2})', line[bm.end():])
+            if m:
+                balance_values.append(float(m.group(1).replace(',', '')))
+            elif i + 1 < len(lines):
+                # Check next line
+                m = re.search(r'\$?([\d,]+\.\d{2})', lines[i + 1])
+                if m:
+                    balance_values.append(float(m.group(1).replace(',', '')))
+
+    ending_balance = balance_values[-1] if balance_values else 0.0
+    last_date = ""
+    date_matches = re.findall(r'Balance\s+(\d{2})/(\d{2})/(\d{2})', text, re.IGNORECASE)
+    if date_matches:
+        mm, dd, yy = date_matches[-1]
+        last_date = f"20{yy}-{mm}-{dd}"
+
+    accounts_df = pd.DataFrame([{
+        "account_id": account_id, "bank_name": bank_name,
+        "account_type": account_type, "currency": "USD",
+        "balance": ending_balance, "yield_rate_bps": 0,
+        "last_updated": last_date or str(datetime.now().date()),
+    }])
+    buf = io.BytesIO(); accounts_df.to_csv(buf, index=False)
+    results["accounts.csv"] = buf.getvalue()
+
+    # Parse transactions line by line
+    year = statement_year
+    in_credits = in_debits = False
+    transactions = []
+
+    CREDIT_HEADERS = {'credits:', 'credit transactions', 'credits'}
+    DEBIT_HEADERS  = {'debits:', 'debit transactions', 'debits', 'other debits', 'checks:', 'checks'}
+    STOP_RE = re.compile(r'^(total credits|total debits|balance \d{2}/\d{2}/\d{2})', re.IGNORECASE)
+
+    for line in lines:
+        ls = line.strip()
+        if not ls:
+            continue
+        if STOP_RE.match(ls):
+            in_credits = in_debits = False
+            continue
+        if ls.lower() in CREDIT_HEADERS:
+            in_credits = True; in_debits = False; continue
+        if ls.lower() in DEBIT_HEADERS:
+            in_credits = False; in_debits = True; continue
+        if not (in_credits or in_debits):
+            continue
+
+        parsed = _parse_txn_line(ls)
+        if parsed:
+            mm_dd, desc, amt_str = parsed
+            mm, dd = mm_dd.split('/')
+            amt = float(amt_str.replace(',', ''))
+            if in_debits:
+                amt = -amt
+            transactions.append({
+                "date": f"{year}-{mm}-{dd}",
+                "account_id": account_id,
+                "description": desc,
+                "amount": amt,
+                "category": _categorize_bank_txn(desc, in_credits),
+            })
+
+    if transactions:
+        txn_df = pd.DataFrame(transactions)
+        buf2 = io.BytesIO(); txn_df.to_csv(buf2, index=False)
+        results["transactions.csv"] = buf2.getvalue()
+
+    return results
+
+
+# ─── Experian Business Credit Parser ────────────────────────
+
+def _parse_experian_business_credit_text(text):
+    """Extract business_credit.csv from Experian Business Credit Advantage PDF text."""
+    text_lower = text.lower()
+    row = {
+        "business_name": "", "duns_number": "", "report_date": "",
+        "paydex_score": 0, "intelliscore": 0, "years_in_business": 0,
+        "sic_code": "", "industry": "", "total_trade_experiences": 0,
+        "current_pct": 0, "days_beyond_terms_avg": 0, "high_credit": 0,
+        "total_balance_outstanding": 0, "payment_trend": "stable",
+        "derogatory_count": 0, "liens": 0, "judgments": 0, "ucc_filings": 0,
+        "bankruptcy_flag": "false", "d_and_b_rating": "", "annual_revenue": 0,
+        "employees": 0, "trade_payment_index": 0,
+    }
+
+    # Business name — first line containing LLC/Inc/Corp etc (search line by line, no cross-line match)
+    for _line in text.split('\n')[:25]:
+        _m = re.search(r'([A-Z][A-Za-z0-9,. &\']+(?:LLC|Inc\.?|Corp\.?|Ltd\.?|LP|LLP))', _line)
+        if _m and len(_m.group(1)) > 4:
+            row["business_name"] = _m.group(1).strip()
+            break
+
+    # Report date
+    date_m = re.search(r'(?:report\s*date|as\s*of|dated?)\s*:?\s*(\d{1,2}/\d{1,2}/\d{2,4})', text_lower)
+    if date_m:
+        raw_date = date_m.group(1)
+        fmt = "%m/%d/%Y" if len(raw_date) > 8 else "%m/%d/%y"
+        try:
+            row["report_date"] = datetime.strptime(raw_date, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            row["report_date"] = raw_date
+
+    # Experian Business Credit Score → use as intelliscore (and paydex placeholder)
+    for pat in [
+        r'receiving a score of (\d{1,3})',
+        r'business\s*credit\s*score\s*[:\s]*(\d{1,3})',
+        r'intelliscore\s*[:\s]*(\d{1,3})',
+        r'(\d{1,3})\s*\n\s*business\s*\n?\s*credit\s*score',
+    ]:
+        m = re.search(pat, text_lower)
+        if m:
+            val = int(m.group(1))
+            if 1 <= val <= 100:
+                row["intelliscore"] = val
+                row["paydex_score"] = val  # use as proxy for scoring engine
+                break
+
+    # Years in business
+    for pat in [
+        r'years?\s*in\s*business\s*[:\s]*(\d+)',
+        r'(\d+)\s*years?\s*in\s*business',
+        r'established\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{4})',
+    ]:
+        m = re.search(pat, text_lower)
+        if m:
+            val = int(m.group(1))
+            if val > 1900:  # matched a year, compute age
+                val = datetime.now().year - val
+            if 0 < val < 200:
+                row["years_in_business"] = val
+                break
+
+    # SIC code
+    sic_m = re.search(r'sic\s*(?:code)?\s*:?\s*(\d{4})', text_lower)
+    if sic_m:
+        row["sic_code"] = sic_m.group(1)
+
+    # Days beyond terms
+    if re.search(r'does not yet have an estimated days beyond|insufficient information', text_lower):
+        row["days_beyond_terms_avg"] = 0
+    else:
+        dbt_m = re.search(r'(?:days?\s*beyond\s*(?:payment\s*)?terms?|dbt)\s*[:\s]*([\d.]+)', text_lower)
+        if dbt_m:
+            row["days_beyond_terms_avg"] = float(dbt_m.group(1))
+
+    # Payment trend
+    if re.search(r'improving|positive trend', text_lower):
+        row["payment_trend"] = "improving"
+    elif re.search(r'declining|deteriorating|negative trend', text_lower):
+        row["payment_trend"] = "declining"
+
+    # Trade experiences / tradelines
+    trade_m = re.search(r'(?:tradelines?|trade\s*experiences?)\s*[:\s]*(\d+)', text_lower)
+    if trade_m:
+        row["total_trade_experiences"] = int(trade_m.group(1))
+
+    # UCC filings — count "Filing Number" occurrences in text
+    ucc_count = len(re.findall(r'filing\s*number', text_lower))
+    if ucc_count > 0:
+        row["ucc_filings"] = ucc_count
+    else:
+        ucc_m = re.search(r'(\d+)\s*ucc\s*(?:filing|lien)', text_lower)
+        if ucc_m:
+            row["ucc_filings"] = int(ucc_m.group(1))
+
+    # Tax liens (not UCC)
+    tax_lien_m = re.search(r'(\d+)\s*tax\s*lien', text_lower)
+    if tax_lien_m:
+        row["liens"] = int(tax_lien_m.group(1))
+
+    # Judgments
+    j_m = re.search(r'(\d+)\s*judgment', text_lower)
+    if j_m:
+        row["judgments"] = int(j_m.group(1))
+
+    # Bankruptcy
+    if re.search(r'bankruptcy\s*[:\s]*(?:yes|true|1)', text_lower):
+        row["bankruptcy_flag"] = "true"
+
+    # Total outstanding balance
+    bal_m = re.search(r'total\s*(?:balance|outstanding)\s*[:\s$]*([\d,]+)', text_lower)
+    if bal_m:
+        row["total_balance_outstanding"] = float(bal_m.group(1).replace(',', ''))
+
+    if row["intelliscore"] > 0 or row["years_in_business"] > 0:
+        df = pd.DataFrame([row])
+        buf = io.BytesIO(); df.to_csv(buf, index=False)
+        return {"business_credit.csv": buf.getvalue()}
+    return {}
+
+
+# ─── PDF Dispatcher ──────────────────────────────────────────
+
+def _parse_pdf(file_bytes, filename):
+    """Returns (results_dict, failed_reason_or_None)."""
+    results = {}
+    failed_reason = None
+
     try:
         import pdfplumber
-
-        # First try: extract structured tables
         pdf = pdfplumber.open(io.BytesIO(file_bytes))
-        for i, pg in enumerate(pdf.pages):
-            for j, table in enumerate(pg.extract_tables()):
-                if not table or len(table) < 2: continue
-                df = pd.DataFrame(table[1:], columns=table[0])
-                csv_type = _guess_csv_type(df, f"{filename}_p{i}_t{j}")
-                if csv_type and csv_type not in results:
-                    buf = io.BytesIO(); df.to_csv(buf, index=False)
-                    results[csv_type] = buf.getvalue()
+        page_count = len(pdf.pages)
+        all_text = ""
+        for pg in pdf.pages:
+            t = pg.extract_text()
+            if t:
+                all_text += t + "\n"
         pdf.close()
 
-        # Second try: if no tables found, extract text and parse with patterns
-        if not results:
-            text = _extract_pdf_text(file_bytes)
-            if text.strip():
-                text_results = _parse_text_to_credit(text, filename)
-                for k, v in text_results.items():
-                    if k not in results:
-                        results[k] = v
+        if _is_garbled_pdf(all_text, page_count):
+            failed_reason = (
+                "This PDF uses a font encoding that can't be read automatically. "
+                "For credit reports, try downloading from Credit Karma or "
+                "annualcreditreport.com instead. Scanned paper documents won't work — "
+                "it needs to be a digital PDF export."
+            )
 
-    except Exception: pass
-    return results
+        elif _is_text_bank_statement(all_text):
+            results = _parse_text_bank_statement(all_text)
+
+        elif _is_experian_business_credit(all_text):
+            results = _parse_experian_business_credit_text(all_text)
+
+        else:
+            # Try generic text-based credit/bank parsing
+            results = _parse_text_to_credit(all_text, filename)
+
+            # Fallback: structured table extraction
+            if not results:
+                pdf2 = pdfplumber.open(io.BytesIO(file_bytes))
+                for i, pg in enumerate(pdf2.pages):
+                    for j, table in enumerate(pg.extract_tables()):
+                        if not table or len(table) < 2:
+                            continue
+                        df = pd.DataFrame(table[1:], columns=table[0])
+                        csv_type = _guess_csv_type(df, f"{filename}_p{i}_t{j}")
+                        if csv_type and csv_type not in results:
+                            buf = io.BytesIO(); df.to_csv(buf, index=False)
+                            results[csv_type] = buf.getvalue()
+                pdf2.close()
+
+    except Exception:
+        pass
+
+    return results, failed_reason
 
 def _parse_docx(file_bytes, filename):
     results = {}
@@ -614,31 +940,60 @@ def _parse_docx(file_bytes, filename):
     except Exception: pass
     return results
 
+def _merge_csv(all_csvs, key, new_bytes):
+    """First-write-wins for most types; merge rows for accounts and transactions."""
+    if key not in all_csvs:
+        all_csvs[key] = new_bytes
+    elif key in ("accounts.csv", "transactions.csv"):
+        try:
+            existing = pd.read_csv(io.BytesIO(all_csvs[key]))
+            new = pd.read_csv(io.BytesIO(new_bytes))
+            merged = pd.concat([existing, new], ignore_index=True)
+            if key == "accounts.csv":
+                merged = merged.drop_duplicates(subset=["account_id"], keep="last")
+            buf = io.BytesIO(); merged.to_csv(buf, index=False)
+            all_csvs[key] = buf.getvalue()
+        except Exception:
+            pass
+
+
 def parse_uploaded_files(uploaded_files):
+    """Returns (all_csvs dict, parse_failures list of (filename, reason))."""
     all_csvs = {}
+    parse_failures = []
+
     for uf in uploaded_files:
         fname = uf.name.lower()
         raw = uf.read(); uf.seek(0)
+
         if fname.endswith(".csv"):
             try:
                 df = pd.read_csv(io.BytesIO(raw))
                 csv_type = _guess_csv_type(df, uf.name)
-                if csv_type and csv_type not in all_csvs:
-                    all_csvs[csv_type] = raw
-                elif csv_type is None:
+                if csv_type:
+                    _merge_csv(all_csvs, csv_type, raw)
+                else:
                     safe_name = re.sub(r'[^a-z0-9_.]', '_', fname)
                     all_csvs[safe_name] = raw
-            except Exception: pass
+            except Exception:
+                pass
+
         elif fname.endswith((".xlsx", ".xls")):
             for k, v in _parse_excel(raw, uf.name).items():
-                if k not in all_csvs: all_csvs[k] = v
+                _merge_csv(all_csvs, k, v)
+
         elif fname.endswith(".pdf"):
-            for k, v in _parse_pdf(raw, uf.name).items():
-                if k not in all_csvs: all_csvs[k] = v
+            file_results, failed_reason = _parse_pdf(raw, uf.name)
+            if failed_reason:
+                parse_failures.append((uf.name, failed_reason))
+            for k, v in file_results.items():
+                _merge_csv(all_csvs, k, v)
+
         elif fname.endswith(".docx"):
             for k, v in _parse_docx(raw, uf.name).items():
-                if k not in all_csvs: all_csvs[k] = v
-    return all_csvs
+                _merge_csv(all_csvs, k, v)
+
+    return all_csvs, parse_failures
 
 
 # ─── Sidebar ────────────────────────────────────────────────
@@ -687,31 +1042,21 @@ with st.sidebar:
             label_visibility="collapsed"
         )
         if uploaded_files:
-            parsed = parse_uploaded_files(uploaded_files)
+            parsed, parse_failures = parse_uploaded_files(uploaded_files)
             if parsed:
                 st.session_state.data_dir = save_uploads(parsed)
                 st.session_state.uploaded_files = parsed
-                st.success(f"{len(parsed)} file(s) loaded")
+                st.success(f"{len(parsed)} data source(s) loaded")
                 for fname in parsed:
                     st.caption(f"  {fname}")
-                # Show which uploaded files didn't parse
-                parsed_count = len(parsed)
-                uploaded_count = len(uploaded_files)
-                if parsed_count < uploaded_count:
-                    skipped = uploaded_count - parsed_count
-                    st.warning(
-                        f"{skipped} file(s) couldn't be read. "
-                        "If a credit report didn't load, try downloading it "
-                        "as a PDF directly from Experian.com, Credit Karma, "
-                        "or annualcreditreport.com. Scanned paper documents "
-                        "won't work — it needs to be a digital download."
-                    )
-            else:
+            # Show specific failure messages for files that couldn't be parsed
+            for fail_name, fail_reason in parse_failures:
+                st.warning(f"**{fail_name}** — {fail_reason}")
+            if not parsed and not parse_failures:
                 st.warning(
                     "We couldn't pull numbers from those files. "
-                    "This usually happens with scanned paper documents or image-based PDFs. "
-                    "Try downloading a digital PDF or CSV export directly from your "
-                    "bank's website, or from Credit Karma / Experian.com for credit reports."
+                    "Try a digital PDF or CSV export from your bank's website, "
+                    "or Credit Karma / Experian.com for credit reports."
                 )
     else:
         st.session_state.using_sample = True
