@@ -861,10 +861,9 @@ def _parse_experian_business_credit_text(text):
 # ─── PDF Dispatcher ──────────────────────────────────────────
 
 def _parse_pdf(file_bytes, filename):
-    """Returns (results_dict, failed_reason_or_None, debug_log_str)."""
+    """Returns (results_dict, failed_reason_or_None)."""
     results = {}
     failed_reason = None
-    debug = []
 
     try:
         import pdfplumber
@@ -877,15 +876,7 @@ def _parse_pdf(file_bytes, filename):
                 all_text += t + "\n"
         pdf.close()
 
-        debug.append(f"pages={page_count} text_len={len(all_text)}")
-        debug.append(f"text_sample: {repr(all_text[:300])}")
-
-        is_garbled = _is_garbled_pdf(all_text, page_count)
-        is_bank    = _is_text_bank_statement(all_text)
-        is_expbiz  = _is_experian_business_credit(all_text)
-        debug.append(f"garbled={is_garbled} bank={is_bank} experian_biz={is_expbiz}")
-
-        if is_garbled:
+        if _is_garbled_pdf(all_text, page_count):
             failed_reason = (
                 "This PDF uses a font encoding that can't be read automatically. "
                 "For credit reports, try downloading from Credit Karma or "
@@ -893,17 +884,14 @@ def _parse_pdf(file_bytes, filename):
                 "it needs to be a digital PDF export."
             )
 
-        elif is_bank:
+        elif _is_text_bank_statement(all_text):
             results = _parse_text_bank_statement(all_text)
-            debug.append(f"bank parse → {list(results.keys())}, txns={len(pd.read_csv(io.BytesIO(results['transactions.csv'])) if 'transactions.csv' in results else [])}")
 
-        elif is_expbiz:
+        elif _is_experian_business_credit(all_text):
             results = _parse_experian_business_credit_text(all_text)
-            debug.append(f"experian biz parse → {list(results.keys())}")
 
         else:
             results = _parse_text_to_credit(all_text, filename)
-            debug.append(f"generic text parse → {list(results.keys())}")
 
             if not results:
                 pdf2 = pdfplumber.open(io.BytesIO(file_bytes))
@@ -917,13 +905,11 @@ def _parse_pdf(file_bytes, filename):
                             buf = io.BytesIO(); df.to_csv(buf, index=False)
                             results[csv_type] = buf.getvalue()
                 pdf2.close()
-                debug.append(f"table fallback → {list(results.keys())}")
 
     except Exception as e:
-        debug.append(f"EXCEPTION: {e}")
         failed_reason = f"Parse error: {e}"
 
-    return results, failed_reason, "\n".join(debug)
+    return results, failed_reason
 
 def _parse_docx(file_bytes, filename):
     results = {}
@@ -970,10 +956,9 @@ def _merge_csv(all_csvs, key, new_bytes):
 
 
 def parse_uploaded_files(uploaded_files):
-    """Returns (all_csvs dict, parse_failures list, debug_logs dict)."""
+    """Returns (all_csvs dict, parse_failures list of (filename, reason))."""
     all_csvs = {}
     parse_failures = []
-    debug_logs = {}
 
     for uf in uploaded_files:
         fname = uf.name.lower()
@@ -988,31 +973,25 @@ def parse_uploaded_files(uploaded_files):
                 else:
                     safe_name = re.sub(r'[^a-z0-9_.]', '_', fname)
                     all_csvs[safe_name] = raw
-                debug_logs[uf.name] = f"CSV → {csv_type or fname}"
-            except Exception as e:
-                debug_logs[uf.name] = f"CSV error: {e}"
+            except Exception:
+                pass
 
         elif fname.endswith((".xlsx", ".xls")):
-            parsed = _parse_excel(raw, uf.name)
-            for k, v in parsed.items():
+            for k, v in _parse_excel(raw, uf.name).items():
                 _merge_csv(all_csvs, k, v)
-            debug_logs[uf.name] = f"Excel → {list(parsed.keys())}"
 
         elif fname.endswith(".pdf"):
-            file_results, failed_reason, debug_log = _parse_pdf(raw, uf.name)
-            debug_logs[uf.name] = debug_log
+            file_results, failed_reason = _parse_pdf(raw, uf.name)
             if failed_reason:
                 parse_failures.append((uf.name, failed_reason))
             for k, v in file_results.items():
                 _merge_csv(all_csvs, k, v)
 
         elif fname.endswith(".docx"):
-            parsed = _parse_docx(raw, uf.name)
-            for k, v in parsed.items():
+            for k, v in _parse_docx(raw, uf.name).items():
                 _merge_csv(all_csvs, k, v)
-            debug_logs[uf.name] = f"Docx → {list(parsed.keys())}"
 
-    return all_csvs, parse_failures, debug_logs
+    return all_csvs, parse_failures
 
 
 # ─── Sidebar ────────────────────────────────────────────────
@@ -1061,14 +1040,13 @@ with st.sidebar:
             label_visibility="collapsed"
         )
         if uploaded_files:
-            parsed, parse_failures, debug_logs = parse_uploaded_files(uploaded_files)
+            parsed, parse_failures = parse_uploaded_files(uploaded_files)
             if parsed:
                 st.session_state.data_dir = save_uploads(parsed)
                 st.session_state.uploaded_files = parsed
                 st.success(f"{len(parsed)} data source(s) loaded")
                 for fname in parsed:
                     st.caption(f"  {fname}")
-            # Show specific failure messages for files that couldn't be parsed
             for fail_name, fail_reason in parse_failures:
                 st.warning(f"**{fail_name}** — {fail_reason}")
             if not parsed and not parse_failures:
@@ -1077,11 +1055,6 @@ with st.sidebar:
                     "Try a digital PDF or CSV export from your bank's website, "
                     "or Credit Karma / Experian.com for credit reports."
                 )
-            # Debug expander — temporary, remove after diagnosing
-            with st.expander("Parse debug (tap to expand)"):
-                for fname, log in debug_logs.items():
-                    st.caption(f"**{fname}**")
-                    st.code(log, language=None)
     else:
         st.session_state.using_sample = True
         st.session_state.data_dir = str(_DIR / "sample_data")
