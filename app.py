@@ -296,9 +296,18 @@ def _is_experian_business_credit(text):
 
 
 def _is_garbled_pdf(text, page_count=1):
+    """Detect PDFs whose text is unreadable — either CID-encoded or custom font-remapped."""
     if not text or len(text.strip()) < 150:
         return True
-    return text.count("(cid:") > 20
+    if text.count("(cid:") > 20:
+        return True
+    sample = text[:3000]
+    symbols = sum(1 for c in sample if c in '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~')
+    alphanum = sum(1 for c in sample if c.isalnum())
+    total = symbols + alphanum
+    if total > 0 and symbols / total > 0.35:
+        return True
+    return False
 
 
 # ─── Bank Statement Text Parser ──────────────────────────────
@@ -537,22 +546,40 @@ def _parse_experian_business_credit_text(text):
 
 # ─── PDF Dispatcher ───────────────────────────────────────────
 
+def _extract_pdf_text_with_fallback(file_bytes):
+    """Try pdfplumber first, fall back to PyMuPDF for CID-encoded fonts."""
+    import pdfplumber
+    pdf = pdfplumber.open(io.BytesIO(file_bytes))
+    page_count = len(pdf.pages)
+    all_text = ""
+    for pg in pdf.pages:
+        t = pg.extract_text()
+        if t:
+            all_text += t + "\n"
+    pdf.close()
+
+    if _is_garbled_pdf(all_text, page_count):
+        try:
+            import fitz
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            pymupdf_text = "\n".join(page.get_text() for page in doc)
+            doc.close()
+            if len(pymupdf_text.strip()) > len(all_text.strip()):
+                all_text = pymupdf_text
+        except Exception:
+            pass
+
+    return all_text, page_count
+
+
 def _parse_pdf(file_bytes, filename):
     """Route PDF to format-specific parser; fall back to table extraction."""
     results = {}
     try:
-        import pdfplumber
-        pdf = pdfplumber.open(io.BytesIO(file_bytes))
-        page_count = len(pdf.pages)
-        all_text = ""
-        for pg in pdf.pages:
-            t = pg.extract_text()
-            if t:
-                all_text += t + "\n"
-        pdf.close()
+        all_text, page_count = _extract_pdf_text_with_fallback(file_bytes)
 
         if _is_garbled_pdf(all_text, page_count):
-            pass  # unreadable — return empty, caller shows generic warning
+            pass  # unreadable — return empty
 
         elif _is_text_bank_statement(all_text):
             results = _parse_text_bank_statement(all_text)
@@ -562,7 +589,8 @@ def _parse_pdf(file_bytes, filename):
 
         else:
             # Fallback: structured table extraction
-            pdf2 = pdfplumber.open(io.BytesIO(file_bytes))
+            import pdfplumber as _pl
+            pdf2 = _pl.open(io.BytesIO(file_bytes))
             for i, pg in enumerate(pdf2.pages):
                 for j, table in enumerate(pg.extract_tables()):
                     if not table or len(table) < 2:
