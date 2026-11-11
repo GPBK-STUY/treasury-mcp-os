@@ -1,23 +1,62 @@
 [project]
 name = "treasury-mcp-os"
 version = "0.1.0"
-description = "Agentic Treasury Management MCP Server"
+description = "MCP server for small-business treasury and credit analysis: cash, forecasting, working capital, covenants, FX, and loan readiness."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Grant Page" }]
 requires-python = ">=3.11"
+keywords = ["mcp", "mcp-server", "model-context-protocol", "treasury", "banking", "fintech", "credit", "cash-flow", "small-business"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Topic :: Office/Business :: Financial",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "mcp[cli]>=1.0.0",
-    "openpyxl>=3.1.5",
+    "mcp[cli]>=1.26,<2",
     "pandas>=2.1.0",
-    "pdfplumber>=0.11.10",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "pymupdf>=1.27.2.3",
-    "python-docx>=1.2.0",
-    "streamlit>=1.30.0",
 ]
 
+[project.optional-dependencies]
+apps = [
+    "streamlit>=1.30.0",
+    "openpyxl>=3.1.5",
+    "pdfplumber>=0.11.10",
+    "pymupdf>=1.27.2.3",
+    "python-docx>=1.2.0",
+]
+
+[project.scripts]
+treasury-mcp-os = "treasury_mcp_os.server:main"
+
+[project.urls]
+Homepage = "https://github.com/GPBK-STUY/treasury-mcp-os"
+Repository = "https://github.com/GPBK-STUY/treasury-mcp-os"
+"Live demo" = "https://treasury-mcp-os-hrxsrpycxbotvmejybhmvy.streamlit.app/"
+
+[tool.hatch.build]
+exclude = ["**/__pycache__", "**/*.pyc", "**/*.backup", "**/.DS_Store"]
+
+[tool.hatch.build.targets.sdist]
+include = ["server.py", "models.py", "tools", "sample_data", "treasury_mcp_os", "README.md", "LICENSE"]
+
 [tool.hatch.build.targets.wheel]
-packages = ["tools"]
+packages = ["treasury_mcp_os"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"server.py" = "treasury_mcp_os/server.py"
+"models.py" = "treasury_mcp_os/models.py"
+"tools" = "treasury_mcp_os/tools"
+"sample_data" = "treasury_mcp_os/sample_data"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"

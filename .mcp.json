@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "treasury-os": {
+      "command": "uv",
+      "args": ["run", "server.py"],
+      "env": { "TREASURY_DATA_DIR": "sample_data" }
+    }
+  }
+}

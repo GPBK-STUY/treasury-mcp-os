@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "treasury-os": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--directory", "${workspaceFolder}", "server.py"]
+    }
+  }
+}

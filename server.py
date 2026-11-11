@@ -18,7 +18,17 @@ from tools.covenant_monitor import monitor_debt_covenants as _monitor_debt_coven
 from tools.credit_parser import parse_credit_report as _parse_credit_report
 from tools.credit_assessor import assess_credit_position as _assess_credit_position
 
-mcp = FastMCP("TreasuryOS")
+INSTRUCTIONS = """TreasuryOS: treasury and credit analysis for small-business banking.
+Act as a junior relationship manager: outputs are advisory, never lending decisions.
+Typical chains:
+- Cash check: get_cash_position -> scan_idle_balances -> forecast_cash_position
+- Company health: analyze_working_capital -> monitor_debt_covenants -> scan_fx_exposure
+- Credit review: parse_credit_report -> assess_credit_position
+Guardrails: flag DSCR < 1.25x, current ratio < 1.20x, leverage > 3.50x, covenant headroom < 10%.
+Never recommend deploying cash below a 20% operating reserve. Format money as $1,250,000.00 and
+show basis points as percentages (450 bps = 4.50%). Credit data is point-in-time; note the pull date."""
+
+mcp = FastMCP("TreasuryOS", instructions=INSTRUCTIONS)
 
 
 @mcp.tool()
@@ -94,7 +104,11 @@ def assess_credit_position(annual_gross_income: float = 0.0) -> dict:
 
 
 def main():
-    mcp.run()
+    transport = os.environ.get("MCP_TRANSPORT", "stdio")
+    if transport != "stdio":
+        mcp.settings.host = os.environ.get("HOST", "0.0.0.0")
+        mcp.settings.port = int(os.environ.get("PORT", "8000"))
+    mcp.run(transport=transport)
 
 if __name__ == "__main__":
     main()

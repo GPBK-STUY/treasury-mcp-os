@@ -3,3 +3,5 @@ __pycache__/
 .DS_Store
 *.backup
 uv.lock
+.venv/
+.claude/settings.local.json

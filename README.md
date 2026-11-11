@@ -4,6 +4,36 @@ Two tools built on one engine. Pick your door.
 
 ---
 
+<!-- mcp-name: io.github.GPBK-STUY/treasury-mcp-os -->
+
+## For AI Agents
+
+TreasuryOS is an **MCP server** with 9 treasury and credit tools. Agents: start with **[AGENTS.md](AGENTS.md)**.
+
+[![Run on Replit](https://replit.com/badge/github/GPBK-STUY/treasury-mcp-os)](https://replit.com/github/GPBK-STUY/treasury-mcp-os)
+
+**Add to any MCP client** (Claude Desktop, Cursor, Windsurf, etc.), no clone needed:
+```json
+{
+  "mcpServers": {
+    "treasury-os": {
+      "command": "uvx",
+      "args": ["treasury-mcp-os"]
+    }
+  }
+}
+```
+
+Claude Code: `claude mcp add treasury-os -- uvx treasury-mcp-os`
+
+Point it at your own data with `TREASURY_DATA_DIR=/path/to/csvs` (defaults to the bundled demo company).
+
+**Remote / HTTP** (Replit, cloud hosts): `MCP_TRANSPORT=streamable-http PORT=8000 python server.py` → `http://<host>:8000/mcp`
+
+Claude Code and VS Code pick up the server automatically from `.mcp.json` and `.vscode/mcp.json` when you open the repo.
+
+---
+
 ## For Business Owners
 
 **Find out if you're ready for a business loan — free, in 5 minutes.**

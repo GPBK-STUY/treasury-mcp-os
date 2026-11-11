@@ -1,0 +1,17 @@
+# TreasuryOS (treasury-mcp-os)
+
+> MCP server and Streamlit apps for small-business banking: cash position, forecasting, working capital, debt covenants, FX exposure, idle cash, payment timing, and credit / loan-readiness scoring. Python 3.11+, no API keys, runs on local CSV data.
+
+## Docs
+- [AGENTS.md](https://github.com/GPBK-STUY/treasury-mcp-os/blob/main/AGENTS.md): setup, run commands, MCP tool reference, data format, conventions
+- [CLAUDE.md](https://github.com/GPBK-STUY/treasury-mcp-os/blob/main/CLAUDE.md): tool-chaining patterns and financial/credit guardrails
+- [README.md](https://github.com/GPBK-STUY/treasury-mcp-os/blob/main/README.md): overview and live app links
+- [QUICKSTART.md](https://github.com/GPBK-STUY/treasury-mcp-os/blob/main/QUICKSTART.md): Claude Desktop setup
+
+## Code
+- [server.py](https://github.com/GPBK-STUY/treasury-mcp-os/blob/main/server.py): MCP server, 9 tools, stdio or streamable HTTP
+- [tools/](https://github.com/GPBK-STUY/treasury-mcp-os/tree/main/tools): analysis engine
+
+## Live apps
+- [Business owner loan readiness](https://treasury-mcp-os-hrxsrpycxbotvmejybhmvy.streamlit.app/)
+- [RM dashboard](https://treasury-os-rm.streamlit.app/)
