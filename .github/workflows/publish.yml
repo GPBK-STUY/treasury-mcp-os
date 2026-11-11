@@ -12,9 +12,9 @@ jobs:
       id-token: write   # PyPI trusted publishing + MCP Registry GitHub OIDC
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -35,7 +35,9 @@ jobs:
         run: |
           python -m venv /tmp/t
           /tmp/t/bin/pip install dist/*.whl
-          /tmp/t/bin/python -c "from treasury_mcp_os import server; r = server.get_cash_position(); assert r['total_balance'] > 0; print('ok')"
+          # Run from outside the checkout so Python imports the installed wheel, not the repo folder.
+          cd /tmp && /tmp/t/bin/python -c "from treasury_mcp_os import server; r = server.get_cash_position(); assert r['total_balance'] > 0; print('ok')"
+          test -x /tmp/t/bin/treasury-mcp-os
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
