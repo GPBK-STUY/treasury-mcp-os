@@ -9,7 +9,7 @@
 - [QUICKSTART.md](https://github.com/GPBK-STUY/treasury-mcp-os/blob/main/QUICKSTART.md): Claude Desktop setup
 
 ## Code
-- [server.py](https://github.com/GPBK-STUY/treasury-mcp-os/blob/main/server.py): MCP server, 9 tools, stdio or streamable HTTP
+- [server.py](https://github.com/GPBK-STUY/treasury-mcp-os/blob/main/server.py): MCP server, 10 tools; tools accept a business's own data inline or analyze a bundled demo
 - [tools/](https://github.com/GPBK-STUY/treasury-mcp-os/tree/main/tools): analysis engine
 
 ## Live apps

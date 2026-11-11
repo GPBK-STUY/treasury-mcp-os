@@ -9,7 +9,7 @@ TreasuryOS is a **Model Context Protocol (MCP) server** plus three Streamlit app
 Python analysis engine for small-business banking: cash position, cash-flow forecasting, working
 capital, debt covenants, FX exposure, idle cash, payment timing, and credit/loan readiness.
 
-- **MCP server:** `server.py` (FastMCP, 9 tools). Runs over stdio (default) or streamable HTTP.
+- **MCP server:** `server.py` (FastMCP, 10 tools). Runs over stdio (default) or streamable HTTP.
 - **Apps:** `smb_app.py` (business owners), `rm_dashboard.py` (relationship managers), `app.py` (full dashboard).
 - **Engine:** `tools/` — pure functions, no side effects, read CSVs from a data directory.
 
@@ -46,8 +46,16 @@ Python 3.11+. No API keys or secrets are required; everything runs on local CSV 
 
 ## MCP tools
 
+Every data tool accepts two optional arguments:
+- `data`: the business's own data, as `{"accounts": <CSV text or list of row objects>, ...}`. Used for that call only.
+- `data_dir`: a local folder of CSVs.
+
+With neither, tools analyze the bundled demo company. Every result includes a `data_source` field
+(`provided`, `folder`, or `demo`). Call `get_data_format` for required columns and allowed values.
+
 | Tool | Inputs | Purpose |
 |---|---|---|
+| `get_data_format` | — | Columns, allowed values and an example row for each data file |
 | `get_cash_position` | — | Balances by currency and account type |
 | `scan_idle_balances` | `operating_reserve_pct=0.20`, `target_yield_bps=450` | Idle cash that could earn more |
 | `forecast_cash_position` | `horizon_days=90` (7–365) | Cash forecast from transaction history |
@@ -94,9 +102,10 @@ builds, smoke-tests, publishes to PyPI (trusted publishing) and to the MCP Regis
 ## Conventions for agents making changes
 
 - Keep tools in `tools/` **pure and idempotent**: inputs in, dict out, no writes, no network.
-- New tool → add module in `tools/`, wrap it with `@mcp.tool()` in `server.py` with a clear docstring
+- New tool → add module in `tools/`, wrap it with `@mcp.tool()` in `server.py` (use the `_source` helper so it accepts `data`/`data_dir`) with a clear docstring
   (the docstring is what MCP clients show to models), and add a row to the table above.
 - Money: format as `$1,250,000.00`; convert bps to % for display (450 bps = 4.50%).
 - Credit output is advisory, never a lending decision.
 - Don't commit `__pycache__/`, `.venv/`, `.DS_Store`, or `*.backup` files.
+- New input columns → update `DATA_FILES` in `server.py` so `get_data_format` and validation stay correct.
 - Quick smoke test: `python -c "import server; print(server.get_cash_position())"`.

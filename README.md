@@ -8,7 +8,7 @@ Two tools built on one engine. Pick your door.
 
 ## For AI Agents
 
-TreasuryOS is an **MCP server** with 9 treasury and credit tools. Agents: start with **[AGENTS.md](AGENTS.md)**.
+TreasuryOS is an **MCP server** with 10 treasury and credit tools. Agents: start with **[AGENTS.md](AGENTS.md)**.
 
 [![Run on Replit](https://replit.com/badge/github/GPBK-STUY/treasury-mcp-os)](https://replit.com/github/GPBK-STUY/treasury-mcp-os)
 
@@ -26,7 +26,7 @@ TreasuryOS is an **MCP server** with 9 treasury and credit tools. Agents: start 
 
 Claude Code: `claude mcp add treasury-os -- uvx treasury-mcp-os`
 
-Point it at your own data with `TREASURY_DATA_DIR=/path/to/csvs` (defaults to the bundled demo company).
+Out of the box it analyzes a bundled demo company. To analyze a real business, agents call `get_data_format` and pass that business's data straight into any tool's `data` argument (CSV text or row objects). It's used for that call only and never stored. You can also set `TREASURY_DATA_DIR=/path/to/csvs`.
 
 **Remote / HTTP** (Replit, cloud hosts): `MCP_TRANSPORT=streamable-http PORT=8000 python server.py` → `http://<host>:8000/mcp`
 

@@ -1,6 +1,6 @@
 [project]
 name = "treasury-mcp-os"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server for small-business treasury and credit analysis: cash, forecasting, working capital, covenants, FX, and loan readiness."
 readme = "README.md"
 license = "MIT"
